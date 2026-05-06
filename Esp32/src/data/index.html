@@ -3,7 +3,6 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ESP32 Motor Control</title>
-    <!-- Cargamos Chart.js desde la memoria del ESP32 -->
     <script src="/js/chart.umd.min.js"></script>
     <style>
         body { 
@@ -16,7 +15,6 @@
         
         .container { max-width: 800px; margin: 0 auto; }
         
-        /* Header */
         header {
             display: flex;
             justify-content: space-between;
@@ -29,10 +27,9 @@
         }
         h2 { margin: 0; font-size: 1.2rem; color: #444; }
         .status { font-weight: bold; font-size: 0.9rem; }
-        .connected { color: #28a745; }
+        .connected    { color: #28a745; }
         .disconnected { color: #dc3545; }
 
-        /* Grid Layout para Métricas */
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -40,7 +37,6 @@
             margin-bottom: 20px;
         }
 
-        /* Tarjetas de Métricas */
         .metric-card {
             background: white;
             padding: 15px;
@@ -52,10 +48,9 @@
         .metric-value { font-size: 1.8rem; font-weight: bold; margin: 5px 0; line-height: 1.2; }
         .unit { font-size: 0.9rem; color: #888; font-weight: normal; }
         
-        .text-cyan { color: #17a2b8; }
+        .text-cyan  { color: #17a2b8; }
         .text-amber { color: #fd7e14; }
 
-        /* Sección de Controles */
         .control-panel {
             background: white;
             padding: 20px;
@@ -75,17 +70,25 @@
             font-weight: 600;
         }
         .btn-led { background: #e2e6ea; color: #444; margin-bottom: 15px; }
-        .btn-led.active { background: #28a745; color: white; box-shadow: 0 4px 10px rgba(40, 167, 69, 0.3); }
+        .btn-led.active { background: #28a745; color: white; box-shadow: 0 4px 10px rgba(40,167,69,0.3); }
         
         .slider-group { margin-top: 15px; }
-        input[type=range] { width: 100%; margin: 10px 0; accent-color: #007bff; height: 6px; background: #ddd; border-radius: 5px; outline: none; -webkit-appearance: none; appearance: none; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #007bff; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        input[type=range] {
+            width: 100%; margin: 10px 0;
+            accent-color: #007bff; height: 6px;
+            background: #ddd; border-radius: 5px;
+            outline: none; -webkit-appearance: none; appearance: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 20px; height: 20px;
+            border-radius: 50%; background: #007bff; cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
         
         .dir-buttons { display: flex; gap: 10px; margin-top: 15px; }
         .btn-dir { background: #f8f9fa; border: 1px solid #ddd; color: #555; }
         .btn-dir.active { background: #007bff; color: white; border-color: #007bff; }
 
-        /* Contenedores de Gráficas */
         .chart-wrapper {
             background: white;
             padding: 15px;
@@ -93,10 +96,9 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             margin-bottom: 20px;
             position: relative;
-            height: 250px; /* Altura fija para las gráficas */
+            height: 250px;
         }
 
-        /* Tabla de Historial */
         .history-panel {
             background: white;
             border-radius: 10px;
@@ -131,7 +133,8 @@
         </div>
         <div class="metric-card">
             <div class="metric-label">Velocidad</div>
-            <div class="metric-value text-cyan"><span id="mSpd">0</span> <span class="unit">mm/s</span></div>
+            <!-- FIX: unidad corregida a m/s (campo speed_m_s del servidor) -->
+            <div class="metric-value text-cyan"><span id="mSpd">0.000</span> <span class="unit">m/s</span></div>
         </div>
         <div class="metric-card">
             <div class="metric-label">Corriente</div>
@@ -139,6 +142,7 @@
         </div>
         <div class="metric-card">
             <div class="metric-label">PWM</div>
+            <!-- FIX: rango máximo corregido a 1023 (10-bit) -->
             <div class="metric-value"><span id="mPwm">0</span> <span class="unit">/1023</span></div>
         </div>
     </div>
@@ -149,15 +153,16 @@
         
         <div class="slider-group">
             <div style="display:flex; justify-content:space-between; font-size:0.9rem; color:#666; margin-bottom:5px;">
-                <label>Velocidad (PWM)</label>
+                <label>Velocidad (PWM 0-1023)</label>
                 <span id="valVel">0</span>
             </div>
+            <!-- FIX: max corregido a 1023 (10-bit PWM) -->
             <input type="range" min="0" max="1023" value="0" id="sliderVel">
         </div>
 
         <div class="dir-buttons">
             <button class="btn-dir active" id="btnFwd" onclick="setDir(1)">Adelante (FWD)</button>
-            <button class="btn-dir" id="btnRev" onclick="setDir(-1)">Atrás (REV)</button>
+            <button class="btn-dir"        id="btnRev" onclick="setDir(-1)">Atrás (REV)</button>
         </div>
     </div>
 
@@ -184,7 +189,7 @@
                     <tr>
                         <th>Hora</th>
                         <th>RPM</th>
-                        <th>mm/s</th>
+                        <th>m/s</th>
                         <th>Amp</th>
                         <th>PWM</th>
                         <th>Dir</th>
@@ -199,29 +204,25 @@
 </div>
 
 <script>
-    // Configuración
-    const MAX_POINTS = 100; // Puntos visibles en la gráfica
+    const MAX_POINTS = 100;
     let ws;
     let isDragging = false;
-    
-    // Almacenamiento de datos para tabla y CSV
     let logData = [];
-    
-    // Inicializar Gráficas (Chart.js)
+
+    // ---- Gráficas ----
     const commonOptions = {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
         plugins: { legend: { display: false } },
         scales: {
-            x: { display: false }, // Ocultar eje X para limpieza visual
+            x: { display: false },
             y: { beginAtZero: true, grid: { color: '#f0f0f0' } }
         }
     };
 
-    // Gráfica RPM
-    const ctxRpm = document.getElementById('chartRpm').getContext('2d');
-    const chartRpm = new Chart(ctxRpm, {
+    const chartRpm = new Chart(
+        document.getElementById('chartRpm').getContext('2d'), {
         type: 'line',
         data: {
             labels: Array(MAX_POINTS).fill(''),
@@ -229,19 +230,15 @@
                 label: 'RPM',
                 data: Array(MAX_POINTS).fill(0),
                 borderColor: '#17a2b8',
-                backgroundColor: 'rgba(23, 162, 184, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.3,
-                pointRadius: 0
+                backgroundColor: 'rgba(23,162,184,0.1)',
+                borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0
             }]
         },
         options: commonOptions
     });
 
-    // Gráfica Corriente
-    const ctxCur = document.getElementById('chartCur').getContext('2d');
-    const chartCur = new Chart(ctxCur, {
+    const chartCur = new Chart(
+        document.getElementById('chartCur').getContext('2d'), {
         type: 'line',
         data: {
             labels: Array(MAX_POINTS).fill(''),
@@ -249,26 +246,21 @@
                 label: 'Corriente (A)',
                 data: Array(MAX_POINTS).fill(0),
                 borderColor: '#fd7e14',
-                backgroundColor: 'rgba(253, 126, 20, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.3,
-                pointRadius: 0
+                backgroundColor: 'rgba(253,126,20,0.1)',
+                borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0
             }]
         },
         options: commonOptions
     });
 
-    // Conexión WebSocket
+    // ---- WebSocket ----
     function init() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const url = `${protocol}//${window.location.hostname}/ws`;
-        
-        ws = new WebSocket(url);
+        ws = new WebSocket(`${protocol}//${window.location.hostname}/ws`);
 
         ws.onopen = () => {
-            document.getElementById('status').innerText = "● Conectado";
-            document.getElementById('status').className = "status connected";
+            document.getElementById('status').innerText = '● Conectado';
+            document.getElementById('status').className = 'status connected';
         };
 
         ws.onmessage = (event) => {
@@ -276,92 +268,96 @@
                 const d = JSON.parse(event.data);
                 updateUI(d);
                 updateCharts(d);
-            } catch(e) { console.error("Error JSON", e); }
+            } catch(e) { console.error('Error JSON', e); }
         };
 
         ws.onclose = () => {
-            document.getElementById('status').innerText = "● Desconectado";
-            document.getElementById('status').className = "status disconnected";
+            document.getElementById('status').innerText = '● Desconectado';
+            document.getElementById('status').className = 'status disconnected';
             setTimeout(init, 2000);
         };
     }
 
-    // Actualizar Interfaz
+    // ---- UI ----
     function updateUI(d) {
-        if(d.rpm !== undefined) document.getElementById('mRpm').innerText = parseFloat(d.rpm).toFixed(0);
-        if(d.speed_mm_s !== undefined) document.getElementById('mSpd').innerText = parseFloat(d.speed_mm_s).toFixed(1);
-        if(d.current !== undefined) document.getElementById('mCur').innerText = parseFloat(d.current).toFixed(2);
-        
-        // Actualizar PWM y Slider solo si no estamos tocándolo
-        if(d.velocity !== undefined) {
+        if (d.rpm !== undefined)
+            document.getElementById('mRpm').innerText = parseFloat(d.rpm).toFixed(0);
+
+        // FIX: leer speed_m_s (campo corregido en el servidor)
+        if (d.speed_m_s !== undefined)
+            document.getElementById('mSpd').innerText = parseFloat(d.speed_m_s).toFixed(3);
+
+        if (d.current !== undefined)
+            document.getElementById('mCur').innerText = parseFloat(d.current).toFixed(2);
+
+        if (d.velocity !== undefined) {
             document.getElementById('mPwm').innerText = d.velocity;
             const slider = document.getElementById('sliderVel');
-            if(!isDragging && slider.value != d.velocity) {
+            if (!isDragging && slider.value != d.velocity) {
                 slider.value = d.velocity;
                 document.getElementById('valVel').innerText = d.velocity;
             }
         }
 
-        if(d.ledState !== undefined) {
+        if (d.ledState !== undefined) {
             const btn = document.getElementById('btnLed');
-            if(d.ledState) {
-                btn.innerText = "LED: ON";
+            if (d.ledState) {
+                btn.innerText = 'LED: ON';
                 btn.classList.add('active');
             } else {
-                btn.innerText = "LED: OFF";
+                btn.innerText = 'LED: OFF';
                 btn.classList.remove('active');
             }
         }
-        
-        if(d.direction !== undefined) {
+
+        if (d.direction !== undefined) {
             document.getElementById('btnFwd').classList.toggle('active', d.direction >= 0);
             document.getElementById('btnRev').classList.toggle('active', d.direction < 0);
         }
     }
 
-    // Actualizar Gráficas e Historial
+    // ---- Gráficas + historial ----
     let lastLogTime = 0;
+
     function updateCharts(d) {
-        // Actualizar gráficas en tiempo real (Buffer circular)
-        if(d.rpm !== undefined) {
+        if (d.rpm !== undefined) {
             chartRpm.data.datasets[0].data.push(d.rpm);
             chartRpm.data.datasets[0].data.shift();
-            chartRpm.update('none'); // 'none' para mejor rendimiento
+            chartRpm.update('none');
         }
-        if(d.current !== undefined) {
+        if (d.current !== undefined) {
             chartCur.data.datasets[0].data.push(d.current);
             chartCur.data.datasets[0].data.shift();
             chartCur.update('none');
         }
 
-        // Guardar en historial (cada 1 segundo)
         const now = Date.now();
-        if(now - lastLogTime > 1000 && d.rpm !== undefined) {
+        if (now - lastLogTime > 1000 && d.rpm !== undefined) {
             lastLogTime = now;
             const row = {
                 time: new Date().toLocaleTimeString(),
-                rpm: d.rpm,
-                spd: d.speed_mm_s || 0,
-                cur: d.current || 0,
-                pwm: d.velocity || 0,
-                dir: (document.getElementById('btnFwd').classList.contains('active')) ? 'FWD' : 'REV'
+                rpm:  d.rpm,
+                // FIX: guardar en m/s usando el campo correcto
+                spd:  d.speed_m_s !== undefined ? d.speed_m_s : (d.speed_mm_s !== undefined ? d.speed_mm_s / 1000 : 0),
+                cur:  d.current  || 0,
+                pwm:  d.velocity || 0,
+                dir:  document.getElementById('btnFwd').classList.contains('active') ? 'FWD' : 'REV'
             };
-            logData.unshift(row); // Agregar al inicio
-            if(logData.length > 50) logData.pop(); // Mantener solo últimos 50 en tabla
+            logData.unshift(row);
+            if (logData.length > 50) logData.pop();
             renderTable();
         }
     }
 
     function renderTable() {
         const tbody = document.getElementById('histBody');
-        if(logData.length === 0) return;
-        
+        if (logData.length === 0) return;
         let html = '';
         logData.forEach(r => {
             html += `<tr>
                 <td>${r.time}</td>
                 <td>${parseFloat(r.rpm).toFixed(0)}</td>
-                <td>${parseFloat(r.spd).toFixed(1)}</td>
+                <td>${parseFloat(r.spd).toFixed(3)}</td>
                 <td>${parseFloat(r.cur).toFixed(2)}</td>
                 <td>${r.pwm}</td>
                 <td>${r.dir}</td>
@@ -370,46 +366,41 @@
         tbody.innerHTML = html;
     }
 
-    // Controles
+    // ---- Controles ----
     function send(data) {
-        if(ws && ws.readyState === WebSocket.OPEN) {
+        if (ws && ws.readyState === WebSocket.OPEN)
             ws.send(JSON.stringify(data));
-        }
     }
 
     function toggleLed() {
-        const btn = document.getElementById('btnLed');
+        const btn  = document.getElementById('btnLed');
         const isOn = btn.classList.contains('active');
-        // Optimista: actualizamos UI antes de confirmar
         btn.classList.toggle('active');
-        btn.innerText = isOn ? "LED: OFF" : "LED: ON";
+        btn.innerText = isOn ? 'LED: OFF' : 'LED: ON';
         send({ led: !isOn });
     }
 
-    function setDir(dir) {
-        send({ direction: dir });
-    }
+    function setDir(dir) { send({ direction: dir }); }
 
-    // Slider Logic
+    // ---- Slider ----
     const slider = document.getElementById('sliderVel');
-    let timeout;
-    
+    let sliderTimeout;
+
     slider.addEventListener('input', (e) => {
         isDragging = true;
         document.getElementById('valVel').innerText = e.target.value;
-        clearTimeout(timeout);
-        // Enviar solo cuando se deje de mover por 100ms para no saturar
-        timeout = setTimeout(() => {
+        clearTimeout(sliderTimeout);
+        sliderTimeout = setTimeout(() => {
             send({ velocity: parseInt(e.target.value) });
         }, 100);
     });
-    
+
     slider.addEventListener('change', (e) => {
         isDragging = false;
         send({ velocity: parseInt(e.target.value) });
     });
 
-    // Utilidades
+    // ---- Utilidades ----
     function clearData() {
         logData = [];
         renderTable();
@@ -420,17 +411,18 @@
     }
 
     function exportCSV() {
-        if(logData.length === 0) return alert("No hay datos");
-        let csv = "Hora,RPM,Velocidad,Corriente,PWM,Direccion\n";
+        if (logData.length === 0) return alert('No hay datos');
+        let csv = 'Hora,RPM,Velocidad(m/s),Corriente(A),PWM,Direccion\n';
         logData.forEach(r => {
             csv += `${r.time},${r.rpm},${r.spd},${r.cur},${r.pwm},${r.dir}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
+        const url  = window.URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
         a.download = 'motor_log.csv';
         a.click();
+        window.URL.revokeObjectURL(url);  // FIX: liberar la URL del objeto
     }
 
     window.onload = init;
