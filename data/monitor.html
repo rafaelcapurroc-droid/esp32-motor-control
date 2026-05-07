@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP32 - Monitoreo</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f0f2f5;color:#333;padding:16px}
+.container{max-width:900px;margin:0 auto;height:100%;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;background:#fff;padding:12px 16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px;flex-shrink:0;flex-wrap:wrap;gap:10px}
+h2{margin:0;font-size:1.1rem;color:#444}
+.status{font-weight:700;font-size:.85rem}
+.connected{color:#28a745}
+.disconnected{color:#dc3545}
+.link-control{background:#007bff;color:#fff;padding:7px 16px;border-radius:6px;text-decoration:none;font-size:.85rem;font-weight:600}
+.link-control:hover{background:#0056b3}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:14px;flex-shrink:0}
+.metric-card{background:#fff;padding:14px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center}
+.metric-label{font-size:.72rem;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.metric-value{font-size:1.7rem;font-weight:700;line-height:1.2}
+.unit{font-size:.85rem;color:#999;font-weight:400}
+.text-cyan{color:#17a2b8}
+.text-amber{color:#fd7e14}
+.history-panel{background:#fff;padding:18px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);flex:1;overflow:hidden;display:flex;flex-direction:column}
+.history-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.history-header h3{font-size:1rem;color:#444}
+.btn-action{padding:6px 12px;font-size:.85rem;border:none;border-radius:4px;cursor:pointer;font-weight:600;margin-left:8px}
+.btn-clear{background:#e2e6ea;color:#444}
+.btn-csv{background:#28a745;color:#fff}
+.table-container{flex:1;overflow-y:auto;border:1px solid #eee;border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{background:#f8f9fa;color:#666;font-weight:600;text-transform:uppercase;font-size:.75rem;letter-spacing:1px;padding:12px;text-align:left;position:sticky;top:0;z-index:1}
+td{padding:10px 12px;border-bottom:1px solid #eee;color:#333}
+tr:last-child td{border-bottom:none}
+tr:hover{background-color:#f8f9fa}
+.empty-msg{text-align:center;padding:20px;color:#999;font-style:italic}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h2>ESP32 - Monitoreo</h2>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div id="status" class="status disconnected">Desconectado</div>
+      <a href="/index.html" class="link-control">Control</a>
+    </div>
+  </header>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <div class="metric-label">RPM</div>
+      <div class="metric-value text-cyan"><span id="mRpm">0</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Velocidad</div>
+      <div class="metric-value text-cyan"><span id="mSpd">0</span> <span class="unit">mm/s</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Corriente</div>
+      <div class="metric-value text-amber"><span id="mCur">0.00</span> <span class="unit">A</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">PWM</div>
+      <div class="metric-value"><span id="mPwm">0</span> <span class="unit">/1023</span></div>
+    </div>
+  </div>
+
+  <div class="history-panel">
+    <div class="history-header">
+      <h3>Historial Reciente</h3>
+      <div>
+        <button class="btn-action btn-clear" onclick="clearTable()">Limpiar</button>
+        <button class="btn-action btn-csv" onclick="downloadCSV()">CSV</button>
+      </div>
+    </div>
+    <div class="table-container">
+      <table id="history-table">
+        <thead>
+          <tr>
+            <th>Hora</th>
+            <th>RPM</th>
+            <th>mm/s</th>
+            <th>A</th>
+            <th>PWM</th>
+            <th>Dir</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="6" class="empty-msg">Esperando datos...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let ws = null;
+let wsRetryTimer = null;
+let historyData = [];
+const MAX_HISTORY = 100;
+
+function wsConnect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  
+  if (wsRetryTimer) { clearTimeout(wsRetryTimer); wsRetryTimer = null; }
+
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${protocol}//${location.hostname}/ws`);
+  
+  ws.onopen = () => {
+    document.getElementById('status').textContent = 'Conectado';
+    document.getElementById('status').className = 'status connected';
+  };
+  
+  ws.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      updateMetrics(d);
+      addToHistory(d);
+    } catch (err) { console.error('JSON parse error', err); }
+  };
+  
+  ws.onerror = () => { ws.close(); };
+  
+  ws.onclose = () => {
+    document.getElementById('status').textContent = 'Desconectado';
+    document.getElementById('status').className = 'status disconnected';
+    ws = null;
+    
+    if (document.visibilityState === 'visible') {
+        if (!wsRetryTimer) wsRetryTimer = setTimeout(wsConnect, 3000);
+    }
+  };
+}
+
+function updateMetrics(d) {
+  if (d.rpm !== undefined)       document.getElementById('mRpm').textContent = (+d.rpm).toFixed(0);
+  if (d.speed_mm_s !== undefined)document.getElementById('mSpd').textContent = (+d.speed_mm_s).toFixed(1);
+  if (d.current !== undefined)   document.getElementById('mCur').textContent = (+d.current).toFixed(2);
+  if (d.velocity !== undefined)  document.getElementById('mPwm').textContent = d.velocity;
+}
+
+function addToHistory(d) {
+  if (d.rpm === undefined) return;
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString();
+  
+  const row = {
+    time: timeStr,
+    rpm: (+d.rpm).toFixed(0),
+    speed: (+d.speed_mm_s || 0).toFixed(1),
+    current: (+d.current || 0).toFixed(2),
+    pwm: d.velocity || 0,
+    dir: (d.direction >= 0) ? 'FWD' : 'REV'
+  };
+
+  historyData.unshift(row);
+  if (historyData.length > MAX_HISTORY) historyData.pop();
+  
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.querySelector('#history-table tbody');
+  if (historyData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Esperando datos...</td></tr>';
+    return;
+  }
+
+  let html = '';
+  historyData.forEach(item => {
+    html += `
+      <tr>
+        <td>${item.time}</td>
+        <td>${item.rpm}</td>
+        <td>${item.speed}</td>
+        <td>${item.current}</td>
+        <td>${item.pwm}</td>
+        <td>${item.dir}</td>
+      </tr>
+    `;
+  });
+  tbody.innerHTML = html;
+}
+
+function clearTable() {
+  historyData = [];
+  renderTable();
+}
+
+function downloadCSV() {
+  if (historyData.length === 0) return;
+  
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "Hora,RPM,mm/s,A,PWM,Dir\n";
+  
+  historyData.forEach(row => {
+    csvContent += `${row.time},${row.rpm},${row.speed},${row.current},${row.pwm},${row.dir}\n`;
+  });
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "motor_data.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// --- GESTIÓN DE CICLO DE VIDA ---
+
+window.addEventListener('beforeunload', () => {
+    if (ws) {
+        ws.close(1000, 'navegando');
+    }
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        wsConnect();
+    } else {
+        if (ws) {
+            ws.close(1000, 'oculto');
+            ws = null;
+        }
+        if (wsRetryTimer) {
+            clearTimeout(wsRetryTimer);
+            wsRetryTimer = null;
+        }
+    }
+});
+
+window.addEventListener('load', () => {
+    if (document.visibilityState === 'visible') {
+        wsConnect();
+    }
+});
+</script>
+</body>
+</html>

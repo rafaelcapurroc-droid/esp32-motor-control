@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP32 Motor Control</title>
+<script src="/js/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background:#f0f2f5;color:#333;padding:16px}
+.container{max-width:900px;margin:0 auto;height:100%;display:flex;flex-direction:column}
+header{display:flex;justify-content:space-between;align-items:center;background:#fff;padding:12px 16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px;flex-shrink:0;flex-wrap:wrap;gap:10px}
+h2{margin:0;font-size:1.1rem;color:#444}
+.status{font-weight:700;font-size:.85rem}
+.connected{color:#28a745}
+.disconnected{color:#dc3545}
+.nav-tabs{display:flex;gap:4px;background:#e9ecef;padding:4px;border-radius:8px}
+.nav-tab{padding:7px 14px;border:none;background:transparent;color:#666;font-weight:600;font-size:.85rem;border-radius:6px;cursor:pointer;transition:background .2s,color .2s}
+.nav-tab.active{background:#fff;color:#007bff;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.speed-banner{background:#fff;padding:14px 18px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;flex-wrap:wrap;gap:10px}
+.speed-label{font-size:.78rem;color:#888;text-transform:uppercase;letter-spacing:1px}
+.speed-value{font-size:2rem;font-weight:700;color:#17a2b8;display:flex;align-items:baseline;gap:6px}
+.speed-unit{font-size:.9rem;color:#999;font-weight:400}
+.speed-extra{font-size:.88rem;color:#666;line-height:1.6}
+.metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:14px;flex-shrink:0}
+.metric-card{background:#fff;padding:14px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center}
+.metric-label{font-size:.72rem;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.metric-value{font-size:1.7rem;font-weight:700;line-height:1.2}
+.unit{font-size:.85rem;color:#999;font-weight:400}
+.text-cyan{color:#17a2b8}
+.text-amber{color:#fd7e14}
+.control-panel{background:#fff;padding:18px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);flex-shrink:0}
+button{padding:11px 18px;font-size:.95rem;border:none;border-radius:6px;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s;width:100%;font-weight:600}
+.btn-led{background:#e2e6ea;color:#444;margin-bottom:14px}
+.btn-led.active{background:#28a745;color:#fff;box-shadow:0 3px 8px rgba(40,167,69,.3)}
+.slider-group{margin-top:14px}
+.slider-label{display:flex;justify-content:space-between;font-size:.88rem;color:#666;margin-bottom:4px}
+input[type=range]{width:100%;margin:8px 0;accent-color:#007bff;height:6px;border-radius:5px;outline:none;cursor:pointer}
+.dir-buttons{display:flex;gap:10px;margin-top:14px}
+.btn-dir{background:#f8f9fa;border:1px solid #ddd;color:#555;flex:1}
+.btn-dir.active{background:#007bff;color:#fff;border-color:#007bff}
+.chart-wrapper{background:#fff;padding:14px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:14px;height:260px;position:relative;flex-shrink:0}
+.chart-title{font-size:.78rem;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.history-panel{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden;flex:1;display:flex;flex-direction:column;min-height:0}
+.table-header{padding:12px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.table-header h3{margin:0;font-size:.95rem;color:#444}
+.table-btns{display:flex;gap:6px}
+.btn-sm{padding:5px 10px;font-size:.78rem;width:auto;background:#6c757d;color:#fff;border-radius:4px}
+.btn-danger{background:#dc3545}
+.table-wrap{overflow-x:auto;overflow-y:auto;flex:1;min-height:0}
+table{width:100%;border-collapse:collapse;min-width:480px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #f0f0f0;font-size:.85rem}
+th{background:#f8f9fa;color:#777;font-weight:600;position:sticky;top:0;z-index:1}
+tr:last-child td{border-bottom:none}
+.page{display:none;height:100%;flex-direction:column}
+.page.active{display:flex}
+</style>
+<base target="_blank">
+</head>
+<body>
+<div class="container">
+  <header>
+    <h2>ESP32 Motor Control</h2>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div id="status" class="status disconnected">Desconectado</div>
+      <div class="nav-tabs">
+        <button class="nav-tab active" id="tabControl" onclick="switchPage('control')">Control</button>
+        <button class="nav-tab" id="tabMonitor" onclick="switchPage('monitor')">Monitoreo</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="speed-banner">
+    <div>
+      <div class="speed-label">Velocidad Actual</div>
+      <div class="speed-value">
+        <span id="bannerSpeed">0.0</span>
+        <span class="speed-unit">mm/s</span>
+      </div>
+    </div>
+    <div class="speed-extra">
+      <div><strong id="bannerRpm">0</strong> RPM</div>
+      <div><strong id="bannerPwm">0</strong> / 1023 PWM</div>
+    </div>
+  </div>
+
+  <!-- ============ PAGINA CONTROL ============ -->
+  <div id="pageControl" class="page active">
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-label">RPM</div>
+        <div class="metric-value text-cyan"><span id="mRpm">0</span></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Velocidad</div>
+        <div class="metric-value text-cyan"><span id="mSpd">0</span> <span class="unit">mm/s</span></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Corriente</div>
+        <div class="metric-value text-amber"><span id="mCur">0.00</span> <span class="unit">A</span></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">PWM</div>
+        <div class="metric-value"><span id="mPwm">0</span> <span class="unit">/1023</span></div>
+      </div>
+    </div>
+    <div class="control-panel">
+      <button id="btnLed" class="btn-led" onclick="toggleLed()">LED: OFF</button>
+      <div class="slider-group">
+        <div class="slider-label">
+          <label>Velocidad (PWM)</label>
+          <span id="valVel">0</span>
+        </div>
+        <input type="range" min="0" max="1023" value="0" id="sliderVel">
+      </div>
+      <div class="dir-buttons">
+        <button class="btn-dir active" id="btnFwd" onclick="setDir(1)">Adelante</button>
+        <button class="btn-dir" id="btnRev" onclick="setDir(-1)">Atras</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PAGINA MONITOREO ============ -->
+  <div id="pageMonitor" class="page">
+    <div class="chart-wrapper">
+      <div class="chart-title">RPM</div>
+      <canvas id="chartRpm" style="height:210px"></canvas>
+    </div>
+    <div class="chart-wrapper">
+      <div class="chart-title">Corriente (A)</div>
+      <canvas id="chartCur" style="height:210px"></canvas>
+    </div>
+    <div class="history-panel">
+      <div class="table-header">
+        <h3>Historial Reciente</h3>
+        <div class="table-btns">
+          <button class="btn-sm" onclick="exportCSV()">CSV</button>
+          <button class="btn-sm btn-danger" onclick="clearData()">Limpiar</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Hora</th><th>RPM</th><th>mm/s</th><th>A</th><th>PWM</th><th>Dir</th></tr>
+          </thead>
+          <tbody id="histBody">
+            <tr><td colspan="6" style="text-align:center;color:#999;padding:20px">Esperando datos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MAX_POINTS = 150;
+let ws = null;
+let wsRetryTimer = null;
+let isDragging = false;
+let logData = [];
+let currentPage = 'control';
+let ledState = false;
+let direction = 1;
+
+const commonOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { display: false },
+    y: { beginAtZero: true, grid: { color: '#f0f0f0' }, ticks: { font: { size: 11 } } }
+  }
+};
+
+let chartRpm = null;
+let chartCur = null;
+
+function initCharts() {
+  const ctxRpm = document.getElementById('chartRpm').getContext('2d');
+  chartRpm = new Chart(ctxRpm, {
+    type: 'line',
+    data: {
+      labels: Array(MAX_POINTS).fill(''),
+      datasets: [{ label: 'RPM', data: Array(MAX_POINTS).fill(0),
+        borderColor: '#17a2b8', backgroundColor: 'rgba(23,162,184,.1)',
+        borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0 }]
+    },
+    options: commonOpts
+  });
+
+  const ctxCur = document.getElementById('chartCur').getContext('2d');
+  chartCur = new Chart(ctxCur, {
+    type: 'line',
+    data: {
+      labels: Array(MAX_POINTS).fill(''),
+      datasets: [{ label: 'Corriente (A)', data: Array(MAX_POINTS).fill(0),
+        borderColor: '#fd7e14', backgroundColor: 'rgba(253,126,20,.1)',
+        borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0 }]
+    },
+    options: commonOpts
+  });
+}
+
+function switchPage(page) {
+  if (page === currentPage) return;
+  currentPage = page;
+
+  document.getElementById('tabControl').classList.toggle('active', page === 'control');
+  document.getElementById('tabMonitor').classList.toggle('active', page === 'monitor');
+
+  document.getElementById('pageControl').classList.toggle('active', page === 'control');
+  document.getElementById('pageMonitor').classList.toggle('active', page === 'monitor');
+
+  if (page === 'monitor' && chartRpm && chartCur) {
+    setTimeout(() => { chartRpm.resize(); chartCur.resize(); }, 50);
+  }
+
+  history.replaceState(null, '', '#' + page);
+}
+
+function wsConnect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${protocol}//${location.hostname}/ws`);
+  ws.onopen = () => {
+    document.getElementById('status').textContent = 'Conectado';
+    document.getElementById('status').className = 'status connected';
+    if (wsRetryTimer) { clearTimeout(wsRetryTimer); wsRetryTimer = null; }
+  };
+  ws.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      updateBanner(d);
+      updateUI(d);
+      updateCharts(d);
+    } catch (err) { console.error('JSON parse error', err); }
+  };
+  ws.onerror = () => { ws.close(); };
+  ws.onclose = () => {
+    document.getElementById('status').textContent = 'Desconectado';
+    document.getElementById('status').className = 'status disconnected';
+    ws = null;
+    if (!wsRetryTimer) wsRetryTimer = setTimeout(wsConnect, 3000);
+  };
+}
+
+function wsSend(data) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(data));
+}
+
+function updateBanner(d) {
+  if (d.speed_mm_s !== undefined) document.getElementById('bannerSpeed').textContent = (+d.speed_mm_s).toFixed(1);
+  if (d.rpm !== undefined)        document.getElementById('bannerRpm').textContent  = (+d.rpm).toFixed(0);
+  if (d.velocity !== undefined)   document.getElementById('bannerPwm').textContent  = d.velocity;
+}
+
+function updateUI(d) {
+  if (d.rpm !== undefined)       document.getElementById('mRpm').textContent = (+d.rpm).toFixed(0);
+  if (d.speed_mm_s !== undefined)document.getElementById('mSpd').textContent = (+d.speed_mm_s).toFixed(1);
+  if (d.current !== undefined)   document.getElementById('mCur').textContent = (+d.current).toFixed(2);
+  if (d.velocity !== undefined) {
+    document.getElementById('mPwm').textContent = d.velocity;
+    if (!isDragging) {
+      document.getElementById('sliderVel').value = d.velocity;
+      document.getElementById('valVel').textContent = d.velocity;
+    }
+  }
+  if (d.ledState !== undefined) {
+    ledState = !!d.ledState;
+    const btn = document.getElementById('btnLed');
+    btn.textContent = ledState ? 'LED: ON' : 'LED: OFF';
+    btn.classList.toggle('active', ledState);
+  }
+  if (d.direction !== undefined) {
+    direction = d.direction;
+    document.getElementById('btnFwd').classList.toggle('active', d.direction >= 0);
+    document.getElementById('btnRev').classList.toggle('active', d.direction < 0);
+  }
+}
+
+let lastLogTime = 0;
+function updateCharts(d) {
+  if (!chartRpm || !chartCur) return;
+  if (d.rpm !== undefined) {
+    chartRpm.data.datasets[0].data.push(+d.rpm);
+    chartRpm.data.datasets[0].data.shift();
+    chartRpm.update('none');
+  }
+  if (d.current !== undefined) {
+    chartCur.data.datasets[0].data.push(+d.current);
+    chartCur.data.datasets[0].data.shift();
+    chartCur.update('none');
+  }
+  const now = Date.now();
+  if (now - lastLogTime > 1000 && d.rpm !== undefined) {
+    lastLogTime = now;
+    logData.unshift({
+      time: new Date().toLocaleTimeString(),
+      rpm: d.rpm, spd: d.speed_mm_s || 0,
+      cur: d.current || 0, pwm: d.velocity || 0,
+      dir: direction >= 0 ? 'FWD' : 'REV'
+    });
+    if (logData.length > 50) logData.length = 50;
+    renderTable();
+  }
+}
+
+function renderTable() {
+  const tb = document.getElementById('histBody');
+  if (!logData.length) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:20px">Sin datos</td></tr>'; return; }
+  tb.innerHTML = logData.map(r =>
+    `<tr><td>${r.time}</td><td>${(+r.rpm).toFixed(0)}</td><td>${(+r.spd).toFixed(1)}</td><td>${(+r.cur).toFixed(2)}</td><td>${r.pwm}</td><td>${r.dir}</td></tr>`
+  ).join('');
+}
+
+function toggleLed() {
+  ledState = !ledState;
+  const btn = document.getElementById('btnLed');
+  btn.textContent = ledState ? 'LED: ON' : 'LED: OFF';
+  btn.classList.toggle('active', ledState);
+  wsSend({ led: ledState });
+}
+
+function setDir(dir) {
+  direction = dir;
+  document.getElementById('btnFwd').classList.toggle('active', dir >= 0);
+  document.getElementById('btnRev').classList.toggle('active', dir < 0);
+  wsSend({ direction: dir });
+}
+
+const slider = document.getElementById('sliderVel');
+let sliderTimeout = null;
+slider.addEventListener('input', e => {
+  isDragging = true;
+  document.getElementById('valVel').textContent = e.target.value;
+  clearTimeout(sliderTimeout);
+  sliderTimeout = setTimeout(() => wsSend({ velocity: +e.target.value }), 80);
+});
+slider.addEventListener('pointerup', e => {
+  isDragging = false;
+  clearTimeout(sliderTimeout);
+  wsSend({ velocity: +e.target.value });
+});
+
+function clearData() {
+  logData = [];
+  renderTable();
+  if (chartRpm) { chartRpm.data.datasets[0].data.fill(0); chartRpm.update(); }
+  if (chartCur) { chartCur.data.datasets[0].data.fill(0); chartCur.update(); }
+}
+
+function exportCSV() {
+  if (!logData.length) { alert('No hay datos'); return; }
+  let csv = 'Hora,RPM,Velocidad,Corriente,PWM,Direccion
+';
+  logData.forEach(r => { csv += `${r.time},${r.rpm},${r.spd},${r.cur},${r.pwm},${r.dir}
+`; });
+  try {
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: 'motor_log.csv' });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch {
+    const a = Object.assign(document.createElement('a'), {
+      href: 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv),
+      download: 'motor_log.csv'
+    });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+}
+
+window.addEventListener('load', () => {
+  initCharts();
+  wsConnect();
+  const hash = location.hash.replace('#', '');
+  if (hash === 'monitor') switchPage('monitor');
+});
+</script>
+</body>
+</html>
