@@ -1,3 +1,4 @@
+# esto fue publicado por Git
 # ESP32 WiFi Motor Control System
 
 Control complete de motor DC con VNH5019 Pololu mediante **Servidor Web WiFi con interfaz web interactiva**.
