@@ -24,26 +24,27 @@
 #define CS_VOLTAGE_PER_AMP  0.14f
 #define CS_OFFSET_VOLTAGE   0.0f
 
-// --- SENSOR HALL (polea con imanes) ---
+// --- CONFIGURACIÓN MECÁNICA (Integrado desde Arduino Uno) ---
 #define MAGNETS_COUNT        8
-#define PULLEY_DIAMETER_MM   60
+#define DRIVE_ROLLER_DIAMETER_MM 40.0f  // Rodillo motriz de la cinta
+#define PULLEY_DIAMETER_MM   60.0f      // Polea sensora (eje motriz)
 
-// --- RODILLO MOTRIZ ---
-#define DRIVE_ROLLER_DIAMETER_MM 40
+// --- CÁLCULO DE CONSTANTES DE VELOCIDAD ---
+// Perímetro del rodillo en metros: (PI * 40mm) / 1000 = 0.1256637 m
+#define PERIMETRO_RODILLO_M (3.14159265f * DRIVE_ROLLER_DIAMETER_MM / 1000.0f)
 
-// --- CINTA ---
-#define BELT_PERIMETER_MM 1150
-
-// --- CONSTANTES DE VELOCIDAD ---
-// Velocidad lineal de la cinta desde RPM:
-// V(m/s) = π × D_rodillo(mm) × RPM / (60 × 1000)
-// V(m/s) = 0.002094395 × RPM
-#define M_S_PER_RPM 0.002094395f
+// Factor para convertir Frecuencia (Hz) a m/s:
+// V(m/s) = (Perimetro / Imanes) * Frecuencia(Hz)
+// Factor = 0.1256637 / 8 = 0.01570796
+#define FACTOR_VELOCIDAD (PERIMETRO_RODILLO_M / MAGNETS_COUNT)
 
 // Para cálculo directo desde tiempo entre pulsos (μs):
-// V(m/s) = (π × D_rodillo / MAGNETS_COUNT) / (T_us / 1e6) / 1000
-// V(m/s) = 15707.963 / T_us
-#define SPEED_FACTOR_MS_NUMERATOR 15707.963f
+// V(m/s) = (FACTOR_VELOCIDAD * 1,000,000) / periodoMicros
+// Equivale a: 15707.96 / periodoMicros
+#define SPEED_FACTOR_MS_NUMERATOR (FACTOR_VELOCIDAD * 1000000.0f)
+
+// Relación RPM Eje Motriz:
+// RPM = 60,000,000 / (periodoMicros * MAGNETS_COUNT)
 
 // --- CONFIGURACIÓN ENCODER ---
 #define ENCODER_STEPS_PER_NOTCH 4
@@ -54,6 +55,8 @@
 #define HALL_TIMEOUT_MS 400
 
 // Tiempo mínimo entre pulsos válidos (μs) — filtra rebotes
-#define HALL_MIN_PULSE_US 100
+// Nota: En el código Arduino usabas 1000us (1ms). Aquí lo dejamos en 100us 
+// para mayor resolución a altas velocidades, pero puedes subirlo a 1000 si hay mucho ruido.
+#define HALL_MIN_PULSE_US 100 
 
 #endif // MOTOR_CONFIG_H

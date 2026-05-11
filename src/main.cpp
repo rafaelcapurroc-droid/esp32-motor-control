@@ -33,11 +33,14 @@ unsigned long lastBlink = 0;
 
 // --- VARIABLES SENSOR HALL ---
 volatile unsigned long lastHallMicros   = 0;
-volatile unsigned long prevHallMicros   = 0;
+volatile unsigned long prevHallMicros   = 0; // No estrictamente necesario con la nueva lógica de periodo directo, pero útil para filtros avanzados
 volatile bool          newPulseAvailable = false;
 volatile unsigned long lastPulseMs      = 0;
+volatile unsigned long currentPeriodMicros = 0; // Nuevo: Almacena el periodo directo
+
 float currentRPM          = 0.0f;
 float currentLinearSpeedMs = 0.0f;
+
 portMUX_TYPE hallMutex = portMUX_INITIALIZER_UNLOCKED;
 
 // --- VARIABLES ENCODER KY-040 ---
@@ -54,80 +57,99 @@ const unsigned long BUTTON_DEBOUNCE_MS = 200;
 // ISRs
 // ============================================================
 void IRAM_ATTR onHallSensorTrigger() {
-    unsigned long now = micros();
-    if ((now - lastHallMicros) > HALL_MIN_PULSE_US) {
-        prevHallMicros   = lastHallMicros;
-        lastHallMicros   = now;
-        lastPulseMs      = millis();
-        newPulseAvailable = true;
-    }
+  unsigned long now = micros();
+  
+  // Debounce por tiempo: ignorar rebotes < HALL_MIN_PULSE_US
+  if ((now - lastHallMicros) > HALL_MIN_PULSE_US) {
+    // Calculamos el periodo directamente aquí para mayor precisión
+    unsigned long period = now - lastHallMicros;
+    
+    lastHallMicros   = now;
+    lastPulseMs      = millis();
+    currentPeriodMicros = period;
+    newPulseAvailable = true;
+  }
 }
 
 void IRAM_ATTR onEncoderInterrupt() {
-    unsigned long now = millis();
-    if (now - lastEncoderReadTime < ENCODER_DEBOUNCE_MS) return;
-    lastEncoderReadTime = now;
-    
-    int clk = digitalRead(ENCODER_CLK_PIN);
-    int dt  = digitalRead(ENCODER_DT_PIN);
-    
-    if (clk == LOW) {
-        if (dt == HIGH) {
-            encoderPosition += ENCODER_VELOCITY_STEP;
-        } else {
-            encoderPosition -= ENCODER_VELOCITY_STEP;
-        }
+  unsigned long now = millis();
+  if (now - lastEncoderReadTime < ENCODER_DEBOUNCE_MS) return;
+  lastEncoderReadTime = now;
+  
+  int clk = digitalRead(ENCODER_CLK_PIN);
+  int dt  = digitalRead(ENCODER_DT_PIN);
+  
+  if (clk == LOW) {
+    if (dt == HIGH) {
+      encoderPosition += ENCODER_VELOCITY_STEP;
+    } else {
+      encoderPosition -= ENCODER_VELOCITY_STEP;
     }
-    
-    if (encoderPosition > MAX_VELOCITY) encoderPosition = MAX_VELOCITY;
-    if (encoderPosition < 0)            encoderPosition = 0;
+  }
+  
+  if (encoderPosition > MAX_VELOCITY) encoderPosition = MAX_VELOCITY;
+  if (encoderPosition < 0)            encoderPosition = 0;
 }
 
 void IRAM_ATTR onEncoderButton() {
-    unsigned long now = millis();
-    if (now - lastButtonDebounce < BUTTON_DEBOUNCE_MS) return;
-    lastButtonDebounce   = now;
-    encoderButtonPressed = true;
+  unsigned long now = millis();
+  if (now - lastButtonDebounce < BUTTON_DEBOUNCE_MS) return;
+  lastButtonDebounce   = now;
+  encoderButtonPressed = true;
 }
 
 // ============================================================
-// Calculo de velocidad
+// Calculo de velocidad (Integrado desde lógica Arduino Uno)
 // ============================================================
 void calculateSpeed() {
-    static unsigned long lastCalcTime = 0;
-    if (millis() - lastCalcTime < 50) return;
-    lastCalcTime = millis();
+  static unsigned long lastCalcTime = 0;
+  
+  // Limitamos la frecuencia de cálculo para no saturar la CPU, 
+  // aunque la ISR ya captura el dato más reciente.
+  if (millis() - lastCalcTime < 50) return;
+  lastCalcTime = millis();
 
-    portENTER_CRITICAL(&hallMutex);
-    bool          hasNewPulse    = newPulseAvailable;
-    unsigned long currentMicros  = lastHallMicros;
-    unsigned long previousMicros = prevHallMicros;
-    unsigned long pulseMs        = lastPulseMs;
-    newPulseAvailable = false;
-    portEXIT_CRITICAL(&hallMutex);
+  portENTER_CRITICAL(&hallMutex);
+  bool hasNewPulse = newPulseAvailable;
+  unsigned long periodUs = currentPeriodMicros;
+  unsigned long pulseMs = lastPulseMs;
+  
+  // Reset flag
+  newPulseAvailable = false;
+  portEXIT_CRITICAL(&hallMutex);
 
-    if (hasNewPulse && previousMicros != 0) {
-        unsigned long deltaTime = currentMicros - previousMicros;
-        
-        if (deltaTime > 1000UL && deltaTime < 2000000UL) {
-            float newRPM = 60000000.0f / ((float)deltaTime * MAGNETS_COUNT);
-            
-            // Filtro de picos bruscos
-            if (currentRPM > 10.0f) {
-                float ratio = newRPM / currentRPM;
-                if (ratio > 3.0f || ratio < 0.33f) {
-                    currentLinearSpeedMs = currentRPM * M_S_PER_RPM;
-                    return;
-                }
-            }
-            
-            currentRPM = (newRPM * 0.6f) + (currentRPM * 0.4f);
-        }
-    } else if (currentRPM > 0.0f && (millis() - pulseMs > HALL_TIMEOUT_MS)) {
-        currentRPM = 0.0f;
+  // Si hay un nuevo pulso válido
+  if (hasNewPulse) {
+    // Validación de rango: 
+    // Min 100us (max RPM ~75,000 teóricas, imposible mecánicamente pero seguro eléctricamente)
+    // Max 2,000,000us (2 segundos, min RPM ~0.375)
+    if (periodUs > 100 && periodUs < 2000000) {
+      
+      // 1. Calcular Velocidad Lineal (m/s)
+      // Fórmula: (FACTOR_VELOCIDAD * 1,000,000) / periodoMicros
+      float newSpeedMs = SPEED_FACTOR_MS_NUMERATOR / (float)periodUs;
+      
+      // 2. Calcular RPM del Eje Motriz
+      // RPM = 60,000,000 / (periodoMicros * IMANES_COUNT)
+      float newRPM = 60000000.0f / ((float)periodUs * MAGNETS_COUNT);
+
+      // Filtro de suavizado simple para evitar saltos bruscos por ruido
+      // Si la velocidad anterior era > 0, aplicamos promedio ponderado
+      if (currentLinearSpeedMs > 0.01f) {
+        currentLinearSpeedMs = (newSpeedMs * 0.7f) + (currentLinearSpeedMs * 0.3f);
+        currentRPM = (newRPM * 0.7f) + (currentRPM * 0.3f);
+      } else {
+        // Primer lectura o arranque desde cero
+        currentLinearSpeedMs = newSpeedMs;
+        currentRPM = newRPM;
+      }
     }
-    
-    currentLinearSpeedMs = currentRPM * M_S_PER_RPM;
+  } 
+  // Timeout: Si no llegan pulsos, la velocidad es 0
+  else if (currentRPM > 0.0f && (millis() - pulseMs > HALL_TIMEOUT_MS)) {
+    currentRPM = 0.0f;
+    currentLinearSpeedMs = 0.0f;
+  }
 }
 
 // ============================================================
@@ -135,37 +157,35 @@ void calculateSpeed() {
 // ============================================================
 void setupMotor() {
 #if ESP_IDF_VERSION_MAJOR >= 5
-    ledcAttach(MOTOR_PWM_PIN, PWM_FREQUENCY, PWM_RESOLUTION);
+  ledcAttach(MOTOR_PWM_PIN, PWM_FREQUENCY, PWM_RESOLUTION);
 #else
-    ledcSetup(PWM_CHANNEL, PWM_FREQUENCY, PWM_RESOLUTION);
-    ledcAttachPin(MOTOR_PWM_PIN, PWM_CHANNEL);
+  ledcSetup(PWM_CHANNEL, PWM_FREQUENCY, PWM_RESOLUTION);
+  ledcAttachPin(MOTOR_PWM_PIN, PWM_CHANNEL);
 #endif
 
-    pinMode(MOTOR_IN1_PIN,    OUTPUT);
-    pinMode(MOTOR_IN2_PIN,    OUTPUT);
-    pinMode(MOTOR_CS_PIN,     INPUT);
-    pinMode(LED_BUILTIN_PIN,  OUTPUT);
-    
-    pinMode(HALL_SENSOR_PIN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(HALL_SENSOR_PIN),
-                    onHallSensorTrigger, FALLING);
-                    
-    pinMode(ENCODER_CLK_PIN, INPUT_PULLUP);
-    pinMode(ENCODER_DT_PIN,  INPUT_PULLUP);
-    pinMode(ENCODER_SW_PIN,  INPUT_PULLUP);
-    
-    attachInterrupt(digitalPinToInterrupt(ENCODER_CLK_PIN),
-                    onEncoderInterrupt, FALLING);
-    attachInterrupt(digitalPinToInterrupt(ENCODER_SW_PIN),
-                    onEncoderButton, FALLING);
+  pinMode(MOTOR_IN1_PIN,    OUTPUT);
+  pinMode(MOTOR_IN2_PIN,    OUTPUT);
+  pinMode(MOTOR_CS_PIN,     INPUT);
+  pinMode(LED_BUILTIN_PIN,  OUTPUT);
+  
+  // Hall Sensor
+  pinMode(HALL_SENSOR_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(HALL_SENSOR_PIN), onHallSensorTrigger, FALLING);
 
-    digitalWrite(MOTOR_IN1_PIN, LOW);
-    digitalWrite(MOTOR_IN2_PIN, LOW);
-    
+  // Encoder
+  pinMode(ENCODER_CLK_PIN, INPUT_PULLUP);
+  pinMode(ENCODER_DT_PIN,  INPUT_PULLUP);
+  pinMode(ENCODER_SW_PIN,  INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_CLK_PIN), onEncoderInterrupt, FALLING);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_SW_PIN), onEncoderButton, FALLING);
+
+  // Estado inicial motor
+  digitalWrite(MOTOR_IN1_PIN, LOW);
+  digitalWrite(MOTOR_IN2_PIN, LOW);
 #if ESP_IDF_VERSION_MAJOR >= 5
-    ledcWrite(MOTOR_PWM_PIN, 0);
+  ledcWrite(MOTOR_PWM_PIN, 0);
 #else
-    ledcWrite(PWM_CHANNEL, 0);
+  ledcWrite(PWM_CHANNEL, 0);
 #endif
 }
 
@@ -173,34 +193,33 @@ void setupMotor() {
 // Loop de control del motor
 // ============================================================
 void updateMotor() {
-    if (encoderPosition != motorVelocity) {
-        motorVelocity = encoderPosition;
-    }
+  if (encoderPosition != motorVelocity) {
+    motorVelocity = encoderPosition;
+  }
 
-    if (encoderButtonPressed) {
-        encoderButtonPressed = false;
-        motorVelocity   = 0;
-        encoderPosition = 0;
-    }
+  if (encoderButtonPressed) {
+    encoderButtonPressed = false;
+    motorVelocity   = 0;
+    encoderPosition = 0;
+  }
 
-    if (motorDirection > 0) {
-        digitalWrite(MOTOR_IN1_PIN, HIGH);
-        digitalWrite(MOTOR_IN2_PIN, LOW);
-    } else if (motorDirection < 0) {
-        digitalWrite(MOTOR_IN1_PIN, LOW);
-        digitalWrite(MOTOR_IN2_PIN, HIGH);
-    } else {
-        // Freno o Coast según el driver, aquí HIGH-HIGH suele ser freno en VNH5019
-        digitalWrite(MOTOR_IN1_PIN, HIGH);
-        digitalWrite(MOTOR_IN2_PIN, HIGH);
-    }
+  if (motorDirection > 0) {
+    digitalWrite(MOTOR_IN1_PIN, HIGH);
+    digitalWrite(MOTOR_IN2_PIN, LOW);
+  } else if (motorDirection < 0) {
+    digitalWrite(MOTOR_IN1_PIN, LOW);
+    digitalWrite(MOTOR_IN2_PIN, HIGH);
+  } else {
+    // Freno activo (High-High en VNH5019)
+    digitalWrite(MOTOR_IN1_PIN, HIGH);
+    digitalWrite(MOTOR_IN2_PIN, HIGH);
+  }
 
-    int pwmVal = constrain(motorVelocity, 0, MAX_VELOCITY);
-    
+  int pwmVal = constrain(motorVelocity, 0, MAX_VELOCITY);
 #if ESP_IDF_VERSION_MAJOR >= 5
-    ledcWrite(MOTOR_PWM_PIN, pwmVal);
+  ledcWrite(MOTOR_PWM_PIN, pwmVal);
 #else
-    ledcWrite(PWM_CHANNEL, pwmVal);
+  ledcWrite(PWM_CHANNEL, pwmVal);
 #endif
 }
 
@@ -208,54 +227,54 @@ void updateMotor() {
 // Lectura de corriente
 // ============================================================
 void updateCurrentReading() {
-    if (millis() - lastCurrentReadTime < CURRENT_READ_INTERVAL) return;
-    lastCurrentReadTime = millis();
+  if (millis() - lastCurrentReadTime < CURRENT_READ_INTERVAL) return;
+  lastCurrentReadTime = millis();
 
-    uint32_t sum = 0;
-    const int samples = 20;
-    for (int i = 0; i < samples; i++) {
-        sum += analogRead(MOTOR_CS_PIN);
-    }
-    
-    float avgRaw          = sum / (float)samples;
-    float voltage         = avgRaw * (3.3f / 4095.0f);
-    float correctedVoltage = voltage - CS_OFFSET_VOLTAGE;
-    
-    if (correctedVoltage < 0.0f) correctedVoltage = 0.0f;
-    
-    cachedCurrent = correctedVoltage / CS_VOLTAGE_PER_AMP;
+  uint32_t sum = 0;
+  const int samples = 20;
+  for (int i = 0; i < samples; i++) {
+    sum += analogRead(MOTOR_CS_PIN);
+  }
+  
+  float avgRaw          = sum / (float)samples;
+  float voltage         = avgRaw * (3.3f / 4095.0f);
+  float correctedVoltage = voltage - CS_OFFSET_VOLTAGE;
+  
+  if (correctedVoltage < 0.0f) correctedVoltage = 0.0f;
+  
+  cachedCurrent = correctedVoltage / CS_VOLTAGE_PER_AMP;
 }
 
 // ============================================================
 // WebSocket — broadcast de estado
 // ============================================================
 void broadcastState() {
-    if (ws.count() == 0) return;
+  if (ws.count() == 0) return;
 
-    JsonDocument doc;
-    doc["velocity"]   = motorVelocity;
-    doc["direction"]  = motorDirection;
-    doc["ledState"]   = (digitalRead(LED_BUILTIN_PIN) == HIGH);
-    doc["current"]    = cachedCurrent;
-    doc["rpm"]        = currentRPM;
-    doc["speed_m_s"]  = currentLinearSpeedMs;
-    doc["speed_mm_s"] = currentLinearSpeedMs * 1000.0f;
+  JsonDocument doc;
+  doc["velocity"]   = motorVelocity;
+  doc["direction"]  = motorDirection;
+  doc["ledState"]   = (digitalRead(LED_BUILTIN_PIN) == HIGH);
+  doc["current"]    = cachedCurrent;
+  doc["rpm"]        = currentRPM;
+  doc["speed_m_s"]  = currentLinearSpeedMs;
+  doc["speed_mm_s"] = currentLinearSpeedMs * 1000.0f;
 
-    String json;
-    serializeJson(doc, json);
-    ws.textAll(json);
+  String json;
+  serializeJson(doc, json);
+  ws.textAll(json);
 }
 
 // ============================================================
 // Debug serial
 // ============================================================
 void debugSerial() {
-    if (millis() - lastDebugTime < DEBUG_INTERVAL) return;
-    lastDebugTime = millis();
-    
-    Serial.printf("[HALL] RPM: %.1f | Belt: %.3f m/s | Current: %.2f A | PWM: %d | Encoder: %d | WS clients: %u\n",
-                  currentRPM, currentLinearSpeedMs, cachedCurrent,
-                  motorVelocity, encoderPosition, ws.count());
+  if (millis() - lastDebugTime < DEBUG_INTERVAL) return;
+  lastDebugTime = millis();
+
+  Serial.printf("[HALL] RPM: %.1f | Belt: %.3f m/s | Current: %.2f A | PWM: %d | Encoder: %d | WS clients: %u\n",
+                currentRPM, currentLinearSpeedMs, cachedCurrent,
+                motorVelocity, encoderPosition, ws.count());
 }
 
 // ============================================================
@@ -263,64 +282,54 @@ void debugSerial() {
 // ============================================================
 void onWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
                       AwsEventType type, void* arg, uint8_t* data, size_t len) {
-    if (type == WS_EVT_CONNECT) {
-        // FIX: limite de 2 clientes conectados simultaneamente
-        if (ws.count() > 2) {
-            client->close();
-            return;
-        }
-        Serial.printf("[WS] Cliente conectado (id=%u, total=%u)\n", client->id(), ws.count());
-        isWebConnected = true;
-        digitalWrite(LED_BUILTIN_PIN, HIGH);
-        broadcastState();
-        
-    } else if (type == WS_EVT_DISCONNECT) {
-        Serial.printf("[WS] Cliente desconectado (id=%u, total=%u)\n", client->id(), ws.count());
-        
-        // FIX: usar ws.count() para verificar si quedan clientes. 
-        if (ws.count() == 0) {
-            isWebConnected = false;
-            digitalWrite(LED_BUILTIN_PIN, LOW);
-            Serial.println("[WS] Ultimo cliente desconectado");
-        }
-        
-    } else if (type == WS_EVT_DATA) {
-        AwsFrameInfo* info = (AwsFrameInfo*)arg;
-        if (info->final && info->index == 0 &&
-            info->len == len && info->opcode == WS_TEXT) {
-            
-            JsonDocument doc;
-            if (deserializeJson(doc, data, len)) return;
-
-            bool stateChanged = false;
-
-            if (doc["led"].is<bool>()) {
-                digitalWrite(LED_BUILTIN_PIN, doc["led"].as<bool>() ? HIGH : LOW);
-                stateChanged = true;
-            }
-
-            if (doc["velocity"].is<int>()) {
-                int vel = constrain(doc["velocity"].as<int>(), 0, MAX_VELOCITY);
-                if (vel != motorVelocity) {
-                    motorVelocity   = vel;
-                    encoderPosition = vel;
-                    stateChanged    = true;
-                }
-            }
-
-            if (doc["direction"].is<int>()) {
-                int newDir = (doc["direction"].as<int>() >= 0) ? 1 : -1;
-                if (newDir != motorDirection) {
-                    motorDirection = newDir;
-                    stateChanged   = true;
-                }
-            }
-
-            if (stateChanged) {
-                broadcastState();
-            }
-        }
+  if (type == WS_EVT_CONNECT) {
+    // FIX: limite de 2 clientes conectados simultaneamente
+    if (ws.count() > 2) {
+      client->close();
+      return;
     }
+    Serial.printf("[WS] Cliente conectado (id=%u, total=%u)\n", client->id(), ws.count());
+    isWebConnected = true;
+    digitalWrite(LED_BUILTIN_PIN, HIGH);
+    broadcastState();
+  } else if (type == WS_EVT_DISCONNECT) {
+    Serial.printf("[WS] Cliente desconectado (id=%u, total=%u)\n", client->id(), ws.count());
+    if (ws.count() == 0) {
+      isWebConnected = false;
+      digitalWrite(LED_BUILTIN_PIN, LOW);
+      Serial.println("[WS] Ultimo cliente desconectado");
+    }
+  } else if (type == WS_EVT_DATA) {
+    AwsFrameInfo* info = (AwsFrameInfo*)arg;
+    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+      JsonDocument doc;
+      if (deserializeJson(doc, data, len)) return;
+
+      bool stateChanged = false;
+      if (doc["led"].is<bool>()) {
+        digitalWrite(LED_BUILTIN_PIN, doc["led"].as<bool>() ? HIGH : LOW);
+        stateChanged = true;
+      }
+      if (doc["velocity"].is<int>()) {
+        int vel = constrain(doc["velocity"].as<int>(), 0, MAX_VELOCITY);
+        if (vel != motorVelocity) {
+          motorVelocity   = vel;
+          encoderPosition = vel;
+          stateChanged    = true;
+        }
+      }
+      if (doc["direction"].is<int>()) {
+        int newDir = (doc["direction"].as<int>() >= 0) ? 1 : -1;
+        if (newDir != motorDirection) {
+          motorDirection = newDir;
+          stateChanged   = true;
+        }
+      }
+      if (stateChanged) {
+        broadcastState();
+      }
+    }
+  }
 }
 
 // ============================================================
@@ -395,87 +404,86 @@ window.onload=init;
 // HTTP — rutas estaticas
 // ============================================================
 void setupHTTPEndpoints() {
-    // FIX: servir archivos desde LittleFS con rutas explicitas
-    server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
-    server.serveStatic("/index.html", LittleFS, "/index.html");
-    server.serveStatic("/monitor.html", LittleFS, "/monitor.html");
-    server.serveStatic("/js/", LittleFS, "/js/");
-    
-    // Fallback: si el archivo no existe en LittleFS
-    server.onNotFound([](AsyncWebServerRequest* request) {
-        const String path = request->url();
-        if (path == "/" || path == "/index.html" || path == "/monitor.html") {
-            request->send_P(200, "text/html", FALLBACK_PAGE);
-            return;
-        }
-        request->send(404, "text/plain", "Not Found: " + path);
-    });
+  server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
+  server.serveStatic("/index.html", LittleFS, "/index.html");
+  server.serveStatic("/monitor.html", LittleFS, "/monitor.html");
+  server.serveStatic("/js/", LittleFS, "/js/");
+  
+  // Fallback: si el archivo no existe en LittleFS
+  server.onNotFound([](AsyncWebServerRequest* request) {
+    const String path = request->url();
+    if (path == "/" || path == "/index.html" || path == "/monitor.html") {
+      request->send_P(200, "text/html", FALLBACK_PAGE);
+      return;
+    }
+    request->send(404, "text/plain", "Not Found: " + path);
+  });
 }
 
 // ============================================================
 // Setup
 // ============================================================
 void setup() {
-    Serial.begin(115200);
-    delay(1000);
-    
-    if (!LittleFS.begin(true)) {
-        Serial.println("[FS] ERROR: No se pudo inicializar LittleFS");
+  Serial.begin(115200);
+  delay(1000);
+  
+  if (!LittleFS.begin(true)) {
+    Serial.println("[FS] ERROR: No se pudo inicializar LittleFS");
+  } else {
+    Serial.println("[FS] LittleFS OK");
+    if (!LittleFS.exists("/index.html")) {
+      Serial.println("[FS] AVISO: /index.html no encontrado en LittleFS");
+      Serial.println("[FS] Ejecuta 'pio run --target uploadfs' para subir los archivos");
     } else {
-        Serial.println("[FS] LittleFS OK");
-        if (!LittleFS.exists("/index.html")) {
-            Serial.println("[FS] AVISO: /index.html no encontrado en LittleFS");
-            Serial.println("[FS] Ejecuta 'pio run --target uploadfs' para subir los archivos");
-        } else {
-            Serial.println("[FS] /index.html encontrado OK");
-        }
-        if (!LittleFS.exists("/monitor.html")) {
-            Serial.println("[FS] AVISO: /monitor.html no encontrado en LittleFS");
-        } else {
-            Serial.println("[FS] /monitor.html encontrado OK");
-        }
+      Serial.println("[FS] /index.html encontrado OK");
     }
+    if (!LittleFS.exists("/monitor.html")) {
+      Serial.println("[FS] AVISO: /monitor.html no encontrado en LittleFS");
+    } else {
+      Serial.println("[FS] /monitor.html encontrado OK");
+    }
+  }
 
-    setupMotor();
-    
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(ssid, apPassword);
-    Serial.printf("[WiFi] AP: %s | IP: %s\n",
-                  ssid, WiFi.softAPIP().toString().c_str());
-
-    ws.onEvent(onWebSocketEvent);
-    server.addHandler(&ws);
-    
-    setupHTTPEndpoints();
-    server.begin();
-    
-    Serial.println("[HTTP] Servidor iniciado");
-    Serial.printf("[INFO] 1 RPM = %.6f m/s de cinta\n", M_S_PER_RPM);
+  setupMotor();
+  
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, apPassword);
+  Serial.printf("[WiFi] AP: %s | IP: %s\n", ssid, WiFi.softAPIP().toString().c_str());
+  
+  ws.onEvent(onWebSocketEvent);
+  server.addHandler(&ws);
+  setupHTTPEndpoints();
+  server.begin();
+  
+  Serial.println("[HTTP] Servidor iniciado");
+  Serial.printf("[INFO] Configuracion Mecanica: Rodillo Ø%.1fmm, Polea Ø%.1fmm, %d Imanes\n", 
+                DRIVE_ROLLER_DIAMETER_MM, PULLEY_DIAMETER_MM, MAGNETS_COUNT);
+  Serial.printf("[INFO] Factor Velocidad: %.6f (m/s)*us\n", FACTOR_VELOCIDAD * 1000000.0f);
 }
 
 // ============================================================
 // Loop principal
 // ============================================================
 void loop() {
-    updateMotor();
-    calculateSpeed();
-    updateCurrentReading();
-    
-    // Limpieza de clientes WebSocket muertos o desconectados
-    ws.cleanupClients();
-    
-    if (!isWebConnected) {
-        if (millis() - lastBlink > 500) {
-            lastBlink = millis();
-            digitalWrite(LED_BUILTIN_PIN, !digitalRead(LED_BUILTIN_PIN));
-        }
+  updateMotor();
+  calculateSpeed();
+  updateCurrentReading();
+  
+  // Limpieza de clientes WebSocket muertos o desconectados
+  ws.cleanupClients();
+  
+  if (!isWebConnected) {
+    if (millis() - lastBlink > 500) {
+      lastBlink = millis();
+      digitalWrite(LED_BUILTIN_PIN, !digitalRead(LED_BUILTIN_PIN));
     }
-    
-    if (isWebConnected && (millis() - lastWsSendTime > WS_SEND_INTERVAL)) {
-        lastWsSendTime = millis();
-        broadcastState();
-    }
-    
-    debugSerial();
-    yield();
+  }
+  
+  if (isWebConnected && (millis() - lastWsSendTime > WS_SEND_INTERVAL)) {
+    lastWsSendTime = millis();
+    broadcastState();
+  }
+  
+  debugSerial();
+  yield();
 }
