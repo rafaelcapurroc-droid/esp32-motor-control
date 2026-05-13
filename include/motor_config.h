@@ -25,22 +25,29 @@
 #define CS_OFFSET_VOLTAGE   0.0f
 
 // --- CONFIGURACIÓN MECÁNICA (Integrado desde Arduino Uno) ---
-#define MAGNETS_COUNT        8
-#define DRIVE_ROLLER_DIAMETER_MM 40.0f  // Rodillo motriz de la cinta
+#define MAGNETS_COUNT        6
+#define DRIVE_ROLLER_DIAMETER_MM 36.0f  // Rodillo motriz de la cinta
 #define PULLEY_DIAMETER_MM   60.0f      // Polea sensora (eje motriz)
 
+// --- CONFIGURACIÓN DE TRANSMISIÓN ---
+#define MOTOR_PULLEY_TEETH   20
+#define AXIS_PULLEY_TEETH    60
+#define TRANSMISSION_RATIO   ((float)MOTOR_PULLEY_TEETH / AXIS_PULLEY_TEETH)
+#define MOTOR_RPM_MAX        2400.0f
+#define AXIS_RPM_MAX         (MOTOR_RPM_MAX * TRANSMISSION_RATIO)
+
 // --- CÁLCULO DE CONSTANTES DE VELOCIDAD ---
-// Perímetro del rodillo en metros: (PI * 40mm) / 1000 = 0.1256637 m
-#define PERIMETRO_RODILLO_M (3.14159265f * DRIVE_ROLLER_DIAMETER_MM / 1000.0f)
+// Perímetro del rodillo en metros: (PI * 36mm) / 1000 = 0.113097 m
+#define DRIVE_ROLLER_PERIMETER_M (3.14159265f * DRIVE_ROLLER_DIAMETER_MM / 1000.0f)
 
 // Factor para convertir Frecuencia (Hz) a m/s:
 // V(m/s) = (Perimetro / Imanes) * Frecuencia(Hz)
-// Factor = 0.1256637 / 8 = 0.01570796
-#define FACTOR_VELOCIDAD (PERIMETRO_RODILLO_M / MAGNETS_COUNT)
+// Factor = 0.113097 / 6 = 0.0188495
+#define FACTOR_VELOCIDAD (DRIVE_ROLLER_PERIMETER_M / MAGNETS_COUNT)
 
 // Para cálculo directo desde tiempo entre pulsos (μs):
 // V(m/s) = (FACTOR_VELOCIDAD * 1,000,000) / periodoMicros
-// Equivale a: 15707.96 / periodoMicros
+// Equivale a: 18849.5 / periodoMicros
 #define SPEED_FACTOR_MS_NUMERATOR (FACTOR_VELOCIDAD * 1000000.0f)
 
 // Relación RPM Eje Motriz:
@@ -52,11 +59,11 @@
 
 // --- LÍMITES DE PROTECCIÓN ---
 // Tiempo máximo sin pulso Hall antes de asumir velocidad 0 (ms)
-#define HALL_TIMEOUT_MS 400
+#define HALL_TIMEOUT_MS 1200
 
 // Tiempo mínimo entre pulsos válidos (μs) — filtra rebotes
 // Nota: En el código Arduino usabas 1000us (1ms). Aquí lo dejamos en 100us 
 // para mayor resolución a altas velocidades, pero puedes subirlo a 1000 si hay mucho ruido.
-#define HALL_MIN_PULSE_US 100 
+#define HALL_MIN_PULSE_US 6000 
 
 #endif // MOTOR_CONFIG_H
