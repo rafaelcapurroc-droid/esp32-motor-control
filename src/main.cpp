@@ -32,16 +32,12 @@ const unsigned long DEBUG_INTERVAL = 1000;
 unsigned long lastBlink = 0;
 
 // --- VARIABLES SENSOR HALL ---
-volatile unsigned long lastHallMicros   = 0;
-volatile unsigned long prevHallMicros   = 0; // No estrictamente necesario con la nueva lógica de periodo directo, pero útil para filtros avanzados
-volatile bool          newPulseAvailable = false;
-volatile unsigned long lastPulseMs      = 0;
-volatile unsigned long currentPeriodMicros = 0; // Nuevo: Almacena el periodo directo
+volatile uint32_t hallPulseCount  = 0;
+volatile uint32_t lastHallMicros  = 0;
+volatile uint32_t lastPulseMicros = 0;
 
 float currentRPM          = 0.0f;
 float currentLinearSpeedMs = 0.0f;
-
-portMUX_TYPE hallMutex = portMUX_INITIALIZER_UNLOCKED;
 
 // --- VARIABLES ENCODER KY-040 ---
 volatile int encoderPosition = 0;
@@ -57,17 +53,11 @@ const unsigned long BUTTON_DEBOUNCE_MS = 200;
 // ISRs
 // ============================================================
 void IRAM_ATTR onHallSensorTrigger() {
-  unsigned long now = micros();
-  
-  // Debounce por tiempo: ignorar rebotes < HALL_MIN_PULSE_US
+  uint32_t now = micros();
   if ((now - lastHallMicros) > HALL_MIN_PULSE_US) {
-    // Calculamos el periodo directamente aquí para mayor precisión
-    unsigned long period = now - lastHallMicros;
-    
-    lastHallMicros   = now;
-    lastPulseMs      = millis();
-    currentPeriodMicros = period;
-    newPulseAvailable = true;
+    lastHallMicros  = now;
+    lastPulseMicros = now;
+    hallPulseCount++;
   }
 }
 
@@ -102,53 +92,45 @@ void IRAM_ATTR onEncoderButton() {
 // Calculo de velocidad (Integrado desde lógica Arduino Uno)
 // ============================================================
 void calculateSpeed() {
-  static unsigned long lastCalcTime = 0;
-  
-  // Limitamos la frecuencia de cálculo para no saturar la CPU, 
-  // aunque la ISR ya captura el dato más reciente.
-  if (millis() - lastCalcTime < 50) return;
-  lastCalcTime = millis();
+  static uint32_t lastCalcTime  = 0;
+  static uint32_t lastPulseSnap = 0;
 
-  portENTER_CRITICAL(&hallMutex);
-  bool hasNewPulse = newPulseAvailable;
-  unsigned long periodUs = currentPeriodMicros;
-  unsigned long pulseMs = lastPulseMs;
-  
-  // Reset flag
-  newPulseAvailable = false;
-  portEXIT_CRITICAL(&hallMutex);
+  const uint32_t WINDOW_MS = 300;
 
-  // Si hay un nuevo pulso válido
-  if (hasNewPulse) {
-    // Validación de rango: 
-    // Min 100us (max RPM ~75,000 teóricas, imposible mecánicamente pero seguro eléctricamente)
-    // Max 2,000,000us (2 segundos, min RPM ~0.375)
-    if (periodUs > 100 && periodUs < 2000000) {
-      
-      // 1. Calcular Velocidad Lineal (m/s)
-      // Fórmula: (FACTOR_VELOCIDAD * 1,000,000) / periodoMicros
-      float newSpeedMs = SPEED_FACTOR_MS_NUMERATOR / (float)periodUs;
-      
-      // 2. Calcular RPM del Eje Motriz
-      // RPM = 60,000,000 / (periodoMicros * IMANES_COUNT)
-      float newRPM = 60000000.0f / ((float)periodUs * MAGNETS_COUNT);
+  uint32_t now = millis();
+  if (now - lastCalcTime < WINDOW_MS) return;
 
-      // Filtro de suavizado simple para evitar saltos bruscos por ruido
-      // Si la velocidad anterior era > 0, aplicamos promedio ponderado
-      if (currentLinearSpeedMs > 0.01f) {
-        currentLinearSpeedMs = (newSpeedMs * 0.7f) + (currentLinearSpeedMs * 0.3f);
-        currentRPM = (newRPM * 0.7f) + (currentRPM * 0.3f);
-      } else {
-        // Primer lectura o arranque desde cero
-        currentLinearSpeedMs = newSpeedMs;
-        currentRPM = newRPM;
-      }
+  uint32_t currentCount = hallPulseCount;
+  uint32_t lastPulseUs  = lastPulseMicros;
+
+  uint32_t deltaPulses = currentCount - lastPulseSnap;
+  uint32_t deltaMs     = now - lastCalcTime;
+
+  lastCalcTime  = now;
+  lastPulseSnap = currentCount;
+
+  bool timeout = (micros() - lastPulseUs) > ((uint32_t)HALL_TIMEOUT_MS * 1000UL);
+
+  if (deltaPulses == 0 || timeout) {
+    currentRPM           *= 0.5f;
+    currentLinearSpeedMs *= 0.5f;
+    if (currentRPM < 0.5f) {
+      currentRPM           = 0.0f;
+      currentLinearSpeedMs = 0.0f;
     }
-  } 
-  // Timeout: Si no llegan pulsos, la velocidad es 0
-  else if (currentRPM > 0.0f && (millis() - pulseMs > HALL_TIMEOUT_MS)) {
-    currentRPM = 0.0f;
-    currentLinearSpeedMs = 0.0f;
+    return;
+  }
+
+  float rawRPM     = ((float)deltaPulses / MAGNETS_COUNT) * (60000.0f / deltaMs);
+  float rawSpeedMs = rawRPM * (DRIVE_ROLLER_PERIMETER_M / 60.0f);
+
+  const float alpha = 0.4f;
+  if (currentRPM < 0.5f) {
+    currentRPM           = rawRPM;
+    currentLinearSpeedMs = rawSpeedMs;
+  } else {
+    currentRPM           = alpha * rawRPM           + (1.0f - alpha) * currentRPM;
+    currentLinearSpeedMs = alpha * rawSpeedMs        + (1.0f - alpha) * currentLinearSpeedMs;
   }
 }
 
@@ -170,7 +152,7 @@ void setupMotor() {
   
   // Hall Sensor
   pinMode(HALL_SENSOR_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(HALL_SENSOR_PIN), onHallSensorTrigger, FALLING);
+  attachInterrupt(digitalPinToInterrupt(HALL_SENSOR_PIN), onHallSensorTrigger, RISING);
 
   // Encoder
   pinMode(ENCODER_CLK_PIN, INPUT_PULLUP);
