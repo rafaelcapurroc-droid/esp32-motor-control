@@ -31,12 +31,19 @@ const unsigned long DEBUG_INTERVAL = 1000;
 #define LED_BUILTIN_PIN 2
 unsigned long lastBlink = 0;
 
-// --- VARIABLES SENSOR HALL ---
-volatile uint32_t hallPulseCount  = 0;
+// --- VARIABLES SENSOR HALL (buffer circular de períodos) ---
+volatile uint32_t hallPeriodBuffer[HALL_BUFFER_SIZE] = {0};
+volatile uint8_t  hallBufferIndex = 0;
+volatile uint8_t  hallBufferCount = 0;
 volatile uint32_t lastHallMicros  = 0;
-volatile uint32_t lastPulseMicros = 0;
 
-float currentRPM          = 0.0f;
+// Constantes de conversión (período en µs → m/s y RPM)
+// RPM   = 60_000_000 / (MAGNETS_COUNT * periodoPromedio_µs)
+// m/s   = PI * D_mm * 1000 / (MAGNETS_COUNT * periodoPromedio_µs)
+static const float HALL_CONST_RPM   = 60000000.0f / MAGNETS_COUNT;
+static const float HALL_CONST_SPEED = (3.14159265f * DRIVE_ROLLER_DIAMETER_MM * 1000.0f) / MAGNETS_COUNT;
+
+float currentRPM           = 0.0f;
 float currentLinearSpeedMs = 0.0f;
 
 // --- VARIABLES ENCODER KY-040 ---
@@ -54,10 +61,13 @@ const unsigned long BUTTON_DEBOUNCE_MS = 200;
 // ============================================================
 void IRAM_ATTR onHallSensorTrigger() {
   uint32_t now = micros();
-  if ((now - lastHallMicros) > HALL_MIN_PULSE_US) {
-    lastHallMicros  = now;
-    lastPulseMicros = now;
-    hallPulseCount++;
+  uint32_t elapsed = now - lastHallMicros;
+
+  if (elapsed > HALL_DEBOUNCE_US) {
+    hallPeriodBuffer[hallBufferIndex] = elapsed;
+    hallBufferIndex = (hallBufferIndex + 1) % HALL_BUFFER_SIZE;
+    if (hallBufferCount < HALL_BUFFER_SIZE) hallBufferCount++;
+    lastHallMicros = now;
   }
 }
 
@@ -65,10 +75,10 @@ void IRAM_ATTR onEncoderInterrupt() {
   unsigned long now = millis();
   if (now - lastEncoderReadTime < ENCODER_DEBOUNCE_MS) return;
   lastEncoderReadTime = now;
-  
+
   int clk = digitalRead(ENCODER_CLK_PIN);
   int dt  = digitalRead(ENCODER_DT_PIN);
-  
+
   if (clk == LOW) {
     if (dt == HIGH) {
       encoderPosition += ENCODER_VELOCITY_STEP;
@@ -76,7 +86,7 @@ void IRAM_ATTR onEncoderInterrupt() {
       encoderPosition -= ENCODER_VELOCITY_STEP;
     }
   }
-  
+
   if (encoderPosition > MAX_VELOCITY) encoderPosition = MAX_VELOCITY;
   if (encoderPosition < 0)            encoderPosition = 0;
 }
@@ -89,53 +99,54 @@ void IRAM_ATTR onEncoderButton() {
 }
 
 // ============================================================
-// Calculo de velocidad (Integrado desde lógica Arduino Uno)
+// Cálculo de velocidad — buffer circular de períodos
 // ============================================================
 void calculateSpeed() {
-  static uint32_t lastCalcTime  = 0;
-  static uint32_t lastPulseSnap = 0;
+  static unsigned long lastCalcTime = 0;
+  const unsigned long CALC_INTERVAL_MS = 500;
 
-  const uint32_t WINDOW_MS = 300;
+  if (millis() - lastCalcTime < CALC_INTERVAL_MS) return;
+  lastCalcTime = millis();
 
-  uint32_t now = millis();
-  if (now - lastCalcTime < WINDOW_MS) return;
+  // Copia atómica del buffer (equivalente al noInterrupts() del Arduino Uno)
+  uint32_t periodos[HALL_BUFFER_SIZE];
+  uint8_t  count;
+  uint32_t ultimoPulso;
 
-  uint32_t currentCount = hallPulseCount;
-  uint32_t lastPulseUs  = lastPulseMicros;
+  portDISABLE_INTERRUPTS();
+  memcpy(periodos, (const void*)hallPeriodBuffer, sizeof(periodos));
+  count       = hallBufferCount;
+  ultimoPulso = lastHallMicros;
+  portENABLE_INTERRUPTS();
 
-  uint32_t deltaPulses = currentCount - lastPulseSnap;
-  uint32_t deltaMs     = now - lastCalcTime;
+  // Timeout: 2 segundos sin pulsos → velocidad cero
+  bool timeout = ((micros() - ultimoPulso) > HALL_TIMEOUT_US);
 
-  lastCalcTime  = now;
-  lastPulseSnap = currentCount;
-
-  bool timeout = (micros() - lastPulseUs) > ((uint32_t)HALL_TIMEOUT_MS * 1000UL);
-
-  if (deltaPulses == 0 || timeout) {
-    currentRPM           *= 0.5f;
-    currentLinearSpeedMs *= 0.5f;
-    if (currentRPM < 0.5f) {
-      currentRPM           = 0.0f;
-      currentLinearSpeedMs = 0.0f;
-    }
+  if (timeout || count == 0) {
+    currentRPM           = 0.0f;
+    currentLinearSpeedMs = 0.0f;
     return;
   }
 
-  float rawRPM     = ((float)deltaPulses / MAGNETS_COUNT) * (60000.0f / deltaMs);
-  float rawSpeedMs = rawRPM * (DRIVE_ROLLER_PERIMETER_M / 60.0f);
+  // Promedio de los períodos en el buffer
+  uint32_t suma = 0;
+  for (uint8_t i = 0; i < HALL_BUFFER_SIZE; i++) {
+    suma += periodos[i];
+  }
+  uint32_t periodoPromedio = suma / HALL_BUFFER_SIZE;
 
-  const float alpha = 0.4f;
-  if (currentRPM < 0.5f) {
-    currentRPM           = rawRPM;
-    currentLinearSpeedMs = rawSpeedMs;
+  // Rango válido: entre 100µs y 2,000,000µs (igual que Arduino Uno)
+  if (periodoPromedio > 100 && periodoPromedio < 2000000) {
+    currentLinearSpeedMs = HALL_CONST_SPEED / (float)periodoPromedio;
+    currentRPM           = HALL_CONST_RPM   / (float)periodoPromedio;
   } else {
-    currentRPM           = alpha * rawRPM           + (1.0f - alpha) * currentRPM;
-    currentLinearSpeedMs = alpha * rawSpeedMs        + (1.0f - alpha) * currentLinearSpeedMs;
+    currentRPM           = 0.0f;
+    currentLinearSpeedMs = 0.0f;
   }
 }
 
 // ============================================================
-// Setup motor y perifericos
+// Setup motor y periféricos
 // ============================================================
 void setupMotor() {
 #if ESP_IDF_VERSION_MAJOR >= 5
@@ -149,7 +160,7 @@ void setupMotor() {
   pinMode(MOTOR_IN2_PIN,    OUTPUT);
   pinMode(MOTOR_CS_PIN,     INPUT);
   pinMode(LED_BUILTIN_PIN,  OUTPUT);
-  
+
   // Hall Sensor
   pinMode(HALL_SENSOR_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(HALL_SENSOR_PIN), onHallSensorTrigger, RISING);
@@ -159,7 +170,7 @@ void setupMotor() {
   pinMode(ENCODER_DT_PIN,  INPUT_PULLUP);
   pinMode(ENCODER_SW_PIN,  INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(ENCODER_CLK_PIN), onEncoderInterrupt, FALLING);
-  attachInterrupt(digitalPinToInterrupt(ENCODER_SW_PIN), onEncoderButton, FALLING);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_SW_PIN),  onEncoderButton,    FALLING);
 
   // Estado inicial motor
   digitalWrite(MOTOR_IN1_PIN, LOW);
@@ -217,13 +228,13 @@ void updateCurrentReading() {
   for (int i = 0; i < samples; i++) {
     sum += analogRead(MOTOR_CS_PIN);
   }
-  
+
   float avgRaw          = sum / (float)samples;
   float voltage         = avgRaw * (3.3f / 4095.0f);
   float correctedVoltage = voltage - CS_OFFSET_VOLTAGE;
-  
+
   if (correctedVoltage < 0.0f) correctedVoltage = 0.0f;
-  
+
   cachedCurrent = correctedVoltage / CS_VOLTAGE_PER_AMP;
 }
 
@@ -265,7 +276,6 @@ void debugSerial() {
 void onWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
                       AwsEventType type, void* arg, uint8_t* data, size_t len) {
   if (type == WS_EVT_CONNECT) {
-    // FIX: limite de 2 clientes conectados simultaneamente
     if (ws.count() > 2) {
       client->close();
       return;
@@ -383,15 +393,14 @@ window.onload=init;
 )HTML";
 
 // ============================================================
-// HTTP — rutas estaticas
+// HTTP — rutas estáticas
 // ============================================================
 void setupHTTPEndpoints() {
   server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
   server.serveStatic("/index.html", LittleFS, "/index.html");
   server.serveStatic("/monitor.html", LittleFS, "/monitor.html");
   server.serveStatic("/js/", LittleFS, "/js/");
-  
-  // Fallback: si el archivo no existe en LittleFS
+
   server.onNotFound([](AsyncWebServerRequest* request) {
     const String path = request->url();
     if (path == "/" || path == "/index.html" || path == "/monitor.html") {
@@ -408,7 +417,7 @@ void setupHTTPEndpoints() {
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  
+
   if (!LittleFS.begin(true)) {
     Serial.println("[FS] ERROR: No se pudo inicializar LittleFS");
   } else {
@@ -427,20 +436,19 @@ void setup() {
   }
 
   setupMotor();
-  
+
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, apPassword);
   Serial.printf("[WiFi] AP: %s | IP: %s\n", ssid, WiFi.softAPIP().toString().c_str());
-  
+
   ws.onEvent(onWebSocketEvent);
   server.addHandler(&ws);
   setupHTTPEndpoints();
   server.begin();
-  
+
   Serial.println("[HTTP] Servidor iniciado");
-  Serial.printf("[INFO] Configuracion Mecanica: Rodillo Ø%.1fmm, Polea Ø%.1fmm, %d Imanes\n", 
-                DRIVE_ROLLER_DIAMETER_MM, PULLEY_DIAMETER_MM, MAGNETS_COUNT);
-  Serial.printf("[INFO] Factor Velocidad: %.6f (m/s)*us\n", FACTOR_VELOCIDAD * 1000000.0f);
+  Serial.printf("[INFO] Rodillo Ø%.1fmm | %d imanes | CONST_SPEED=%.4f | CONST_RPM=%.0f\n",
+                DRIVE_ROLLER_DIAMETER_MM, MAGNETS_COUNT, HALL_CONST_SPEED, HALL_CONST_RPM);
 }
 
 // ============================================================
@@ -450,22 +458,21 @@ void loop() {
   updateMotor();
   calculateSpeed();
   updateCurrentReading();
-  
-  // Limpieza de clientes WebSocket muertos o desconectados
+
   ws.cleanupClients();
-  
+
   if (!isWebConnected) {
     if (millis() - lastBlink > 500) {
       lastBlink = millis();
       digitalWrite(LED_BUILTIN_PIN, !digitalRead(LED_BUILTIN_PIN));
     }
   }
-  
+
   if (isWebConnected && (millis() - lastWsSendTime > WS_SEND_INTERVAL)) {
     lastWsSendTime = millis();
     broadcastState();
   }
-  
+
   debugSerial();
   yield();
 }

@@ -24,7 +24,7 @@
 #define CS_VOLTAGE_PER_AMP  0.14f
 #define CS_OFFSET_VOLTAGE   0.0f
 
-// --- CONFIGURACIÓN MECÁNICA (Integrado desde Arduino Uno) ---
+// --- CONFIGURACIÓN MECÁNICA ---
 #define MAGNETS_COUNT        6
 #define DRIVE_ROLLER_DIAMETER_MM 36.0f  // Rodillo motriz de la cinta
 #define PULLEY_DIAMETER_MM   60.0f      // Polea sensora (eje motriz)
@@ -36,34 +36,18 @@
 #define MOTOR_RPM_MAX        2400.0f
 #define AXIS_RPM_MAX         (MOTOR_RPM_MAX * TRANSMISSION_RATIO)
 
-// --- CÁLCULO DE CONSTANTES DE VELOCIDAD ---
-// Perímetro del rodillo en metros: (PI * 36mm) / 1000 = 0.113097 m
-#define DRIVE_ROLLER_PERIMETER_M (3.14159265f * DRIVE_ROLLER_DIAMETER_MM / 1000.0f)
-
-// Factor para convertir Frecuencia (Hz) a m/s:
-// V(m/s) = (Perimetro / Imanes) * Frecuencia(Hz)
-// Factor = 0.113097 / 6 = 0.0188495
-#define FACTOR_VELOCIDAD (DRIVE_ROLLER_PERIMETER_M / MAGNETS_COUNT)
-
-// Para cálculo directo desde tiempo entre pulsos (μs):
-// V(m/s) = (FACTOR_VELOCIDAD * 1,000,000) / periodoMicros
-// Equivale a: 18849.5 / periodoMicros
-#define SPEED_FACTOR_MS_NUMERATOR (FACTOR_VELOCIDAD * 1000000.0f)
-
-// Relación RPM Eje Motriz:
-// RPM = 60,000,000 / (periodoMicros * MAGNETS_COUNT)
-
 // --- CONFIGURACIÓN ENCODER ---
 #define ENCODER_STEPS_PER_NOTCH 4
 #define ENCODER_VELOCITY_STEP   10
 
 // --- LÍMITES DE PROTECCIÓN ---
-// Tiempo máximo sin pulso Hall antes de asumir velocidad 0 (ms)
-#define HALL_TIMEOUT_MS 1200
+// Tiempo máximo sin pulso Hall antes de asumir velocidad 0 (µs)
+#define HALL_TIMEOUT_US      2000000UL   // 2 segundos (igual que Arduino Uno)
 
-// Tiempo mínimo entre pulsos válidos (μs) — filtra rebotes
-// Nota: En el código Arduino usabas 1000us (1ms). Aquí lo dejamos en 100us 
-// para mayor resolución a altas velocidades, pero puedes subirlo a 1000 si hay mucho ruido.
-#define HALL_MIN_PULSE_US 6000 
+// Debounce mínimo entre pulsos válidos (µs) — igual que Arduino Uno
+#define HALL_DEBOUNCE_US     200
+
+// Tamaño del buffer circular de períodos (1 vuelta completa con 6 imanes)
+#define HALL_BUFFER_SIZE     6
 
 #endif // MOTOR_CONFIG_H
