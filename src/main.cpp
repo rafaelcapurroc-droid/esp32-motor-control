@@ -95,18 +95,22 @@ void initLCD() {
   if (lcd) return;
 
   Wire.begin(LCD_SDA_PIN, LCD_SCL_PIN);
+  Wire.setClock(400000);
+
   uint8_t address = scanI2CAddress();
   if (address == 0) {
-    address = 0x3F; // fallback address
-    Serial.println("[LCD] No known I2C LCD address detected, using fallback 0x3F");
-  } else {
-    Serial.printf("[LCD] Using LCD I2C address 0x%02X\n", address);
+    Serial.println("[LCD] No I2C devices found on bus 21/22");
+    return;
   }
 
+  Serial.printf("[LCD] Using LCD I2C address 0x%02X\n", address);
+
   lcd = new LiquidCrystal_I2C(address, 16, 2);
-  lcd->init();
-  Wire.begin(LCD_SDA_PIN, LCD_SCL_PIN); // restore explicit pins after library init
+  lcd->begin(16, 2);
   lcd->backlight();
+  lcd->clear();
+  lcd->display();
+  Serial.printf("[LCD] Initialized at 0x%02X\n", address);
 }
 
 // ============================================================
