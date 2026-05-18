@@ -4,6 +4,8 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 #include "motor_config.h"
 
 const char* ssid      = "ESP32_Motor_Control";
@@ -56,6 +58,18 @@ volatile bool encoderButtonPressed = false;
 unsigned long lastButtonDebounce = 0;
 const unsigned long BUTTON_DEBOUNCE_MS = 200;
 
+// --- EMERGENCY STOP BUTTON (PIN 34) ---
+#define EMERGENCY_STOP_PIN 34
+volatile bool emergencyStopActive = false;
+unsigned long lastEmergencyDebounce = 0;
+const unsigned long EMERGENCY_DEBOUNCE_MS = 100;
+
+// --- LCD 16x2 I2C ---
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+int pendingVelocity = 0;
+unsigned long lastLcdUpdate = 0;
+const unsigned long LCD_UPDATE_INTERVAL = 200;
+
 // ============================================================
 // ISRs
 // ============================================================
@@ -81,14 +95,14 @@ void IRAM_ATTR onEncoderInterrupt() {
 
   if (clk == LOW) {
     if (dt == HIGH) {
-      encoderPosition += ENCODER_VELOCITY_STEP;
+      pendingVelocity += ENCODER_VELOCITY_STEP;
     } else {
-      encoderPosition -= ENCODER_VELOCITY_STEP;
+      pendingVelocity -= ENCODER_VELOCITY_STEP;
     }
   }
 
-  if (encoderPosition > MAX_VELOCITY) encoderPosition = MAX_VELOCITY;
-  if (encoderPosition < 0)            encoderPosition = 0;
+  if (pendingVelocity > MAX_VELOCITY) pendingVelocity = MAX_VELOCITY;
+  if (pendingVelocity < 0)            pendingVelocity = 0;
 }
 
 void IRAM_ATTR onEncoderButton() {
@@ -96,6 +110,13 @@ void IRAM_ATTR onEncoderButton() {
   if (now - lastButtonDebounce < BUTTON_DEBOUNCE_MS) return;
   lastButtonDebounce   = now;
   encoderButtonPressed = true;
+}
+
+void IRAM_ATTR onEmergencyStop() {
+  unsigned long now = millis();
+  if (now - lastEmergencyDebounce < EMERGENCY_DEBOUNCE_MS) return;
+  lastEmergencyDebounce = now;
+  emergencyStopActive = true;
 }
 
 // ============================================================
@@ -172,6 +193,10 @@ void setupMotor() {
   attachInterrupt(digitalPinToInterrupt(ENCODER_CLK_PIN), onEncoderInterrupt, FALLING);
   attachInterrupt(digitalPinToInterrupt(ENCODER_SW_PIN),  onEncoderButton,    FALLING);
 
+  // Emergency Stop Button (pin 34 - no internal pull-up)
+  pinMode(EMERGENCY_STOP_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(EMERGENCY_STOP_PIN), onEmergencyStop, FALLING);
+
   // Estado inicial motor
   digitalWrite(MOTOR_IN1_PIN, LOW);
   digitalWrite(MOTOR_IN2_PIN, LOW);
@@ -186,14 +211,28 @@ void setupMotor() {
 // Loop de control del motor
 // ============================================================
 void updateMotor() {
-  if (encoderPosition != motorVelocity) {
-    motorVelocity = encoderPosition;
+  // Emergency stop check - must run before any other logic
+  if (emergencyStopActive) {
+    motorVelocity       = 0;
+    encoderPosition     = 0;
+    emergencyStopActive = false;
+    // Active brake immediately
+    digitalWrite(MOTOR_IN1_PIN, HIGH);
+    digitalWrite(MOTOR_IN2_PIN, HIGH);
+#if ESP_IDF_VERSION_MAJOR >= 5
+    ledcWrite(MOTOR_PWM_PIN, 0);
+#else
+    ledcWrite(PWM_CHANNEL, 0);
+#endif
+    broadcastState();
+    return;  // Exit without executing rest of updateMotor()
   }
 
+  // Encoder button confirmation - apply pendingVelocity to motor
   if (encoderButtonPressed) {
     encoderButtonPressed = false;
-    motorVelocity   = 0;
-    encoderPosition = 0;
+    motorVelocity   = pendingVelocity;
+    encoderPosition = pendingVelocity;
   }
 
   if (motorDirection > 0) {
@@ -245,13 +284,14 @@ void broadcastState() {
   if (ws.count() == 0) return;
 
   JsonDocument doc;
-  doc["velocity"]   = motorVelocity;
-  doc["direction"]  = motorDirection;
-  doc["ledState"]   = (digitalRead(LED_BUILTIN_PIN) == HIGH);
-  doc["current"]    = cachedCurrent;
-  doc["rpm"]        = currentRPM;
-  doc["speed_m_s"]  = currentLinearSpeedMs;
-  doc["speed_mm_s"] = currentLinearSpeedMs * 1000.0f;
+  doc["velocity"]        = motorVelocity;
+  doc["pendingVelocity"] = pendingVelocity;
+  doc["direction"]       = motorDirection;
+  doc["ledState"]        = (digitalRead(LED_BUILTIN_PIN) == HIGH);
+  doc["current"]         = cachedCurrent;
+  doc["rpm"]             = currentRPM;
+  doc["speed_m_s"]       = currentLinearSpeedMs;
+  doc["speed_mm_s"]      = currentLinearSpeedMs * 1000.0f;
 
   String json;
   serializeJson(doc, json);
@@ -268,6 +308,40 @@ void debugSerial() {
   Serial.printf("[HALL] RPM: %.1f | Belt: %.3f m/s | Current: %.2f A | PWM: %d | Encoder: %d | WS clients: %u\n",
                 currentRPM, currentLinearSpeedMs, cachedCurrent,
                 motorVelocity, encoderPosition, ws.count());
+}
+
+// ============================================================
+// LCD Functions
+// ============================================================
+void lcdShowWelcome() {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("  Motor Control ");
+    lcd.setCursor(0, 1);
+    lcd.print("   ESP32  v1.0  ");
+    delay(2500);
+    lcd.clear();
+}
+
+void updateLCD() {
+    if (millis() - lastLcdUpdate < LCD_UPDATE_INTERVAL) return;
+    lastLcdUpdate = millis();
+
+    // Line 0: sensed speed (RPM from Hall sensor)
+    lcd.setCursor(0, 0);
+    lcd.print("Sen:");
+    char bufSen[12];
+    snprintf(bufSen, sizeof(bufSen), "%-7.1f", currentRPM);
+    lcd.print(bufSen);
+    lcd.print(" RPM");
+
+    // Line 1: desired speed (pending confirmation from encoder)
+    lcd.setCursor(0, 1);
+    lcd.print("Des:");
+    char bufDes[12];
+    snprintf(bufDes, sizeof(bufDes), "%-8d", pendingVelocity);
+    lcd.print(bufDes);
+    lcd.print("PWM");
 }
 
 // ============================================================
@@ -307,6 +381,7 @@ void onWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
         if (vel != motorVelocity) {
           motorVelocity   = vel;
           encoderPosition = vel;
+          pendingVelocity = vel;  // Sync pendingVelocity with WebSocket command
           stateChanged    = true;
         }
       }
@@ -437,6 +512,13 @@ void setup() {
 
   setupMotor();
 
+  // LCD I2C initialization (SDA=21, SCL=22)
+  Wire.begin(21, 22);
+  lcd.init();
+  lcd.backlight();
+  lcdShowWelcome();
+  pendingVelocity = motorVelocity;
+
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, apPassword);
   Serial.printf("[WiFi] AP: %s | IP: %s\n", ssid, WiFi.softAPIP().toString().c_str());
@@ -474,5 +556,6 @@ void loop() {
   }
 
   debugSerial();
+  updateLCD();
   yield();
 }
