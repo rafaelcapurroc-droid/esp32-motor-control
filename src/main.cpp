@@ -65,10 +65,49 @@ unsigned long lastEmergencyDebounce = 0;
 const unsigned long EMERGENCY_DEBOUNCE_MS = 100;
 
 // --- LCD 16x2 I2C ---
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C *lcd = nullptr;
 int pendingVelocity = 0;
 unsigned long lastLcdUpdate = 0;
 const unsigned long LCD_UPDATE_INTERVAL = 200;
+
+uint8_t scanI2CAddress() {
+  uint8_t foundAddress = 0;
+  Serial.println("[I2C] Starting bus scan...");
+
+  for (uint8_t address = 0x20; address < 0x40; address++) {
+    Wire.beginTransmission(address);
+    if (Wire.endTransmission() == 0) {
+      Serial.printf("[I2C] Device found at 0x%02X\n", address);
+      if (address == 0x27 || address == 0x3F || address == 0x3E || address == 0x20 || address == 0x38) {
+        foundAddress = address;
+        break;
+      }
+      if (!foundAddress) {
+        foundAddress = address;
+      }
+    }
+  }
+
+  return foundAddress;
+}
+
+void initLCD() {
+  if (lcd) return;
+
+  Wire.begin(LCD_SDA_PIN, LCD_SCL_PIN);
+  uint8_t address = scanI2CAddress();
+  if (address == 0) {
+    address = 0x3F; // fallback address
+    Serial.println("[LCD] No known I2C LCD address detected, using fallback 0x3F");
+  } else {
+    Serial.printf("[LCD] Using LCD I2C address 0x%02X\n", address);
+  }
+
+  lcd = new LiquidCrystal_I2C(address, 16, 2);
+  lcd->init();
+  Wire.begin(LCD_SDA_PIN, LCD_SCL_PIN); // restore explicit pins after library init
+  lcd->backlight();
+}
 
 // ============================================================
 // ISRs
@@ -319,34 +358,36 @@ void debugSerial() {
 // LCD Functions
 // ============================================================
 void lcdShowWelcome() {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("  Motor Control ");
-    lcd.setCursor(0, 1);
-    lcd.print("   ESP32  v1.0  ");
+    if (!lcd) return;
+    lcd->clear();
+    lcd->setCursor(0, 0);
+    lcd->print("  Motor Control ");
+    lcd->setCursor(0, 1);
+    lcd->print("   ESP32  v1.0  ");
     delay(2500);
-    lcd.clear();
+    lcd->clear();
 }
 
 void updateLCD() {
+    if (!lcd) return;
     if (millis() - lastLcdUpdate < LCD_UPDATE_INTERVAL) return;
     lastLcdUpdate = millis();
 
     // Line 0: sensed speed (RPM from Hall sensor)
-    lcd.setCursor(0, 0);
-    lcd.print("Sen:");
+    lcd->setCursor(0, 0);
+    lcd->print("Sen:");
     char bufSen[12];
     snprintf(bufSen, sizeof(bufSen), "%-7.1f", currentRPM);
-    lcd.print(bufSen);
-    lcd.print(" RPM");
+    lcd->print(bufSen);
+    lcd->print(" RPM");
 
     // Line 1: desired speed (pending confirmation from encoder)
-    lcd.setCursor(0, 1);
-    lcd.print("Des:");
+    lcd->setCursor(0, 1);
+    lcd->print("Des:");
     char bufDes[12];
     snprintf(bufDes, sizeof(bufDes), "%-8d", pendingVelocity);
-    lcd.print(bufDes);
-    lcd.print("PWM");
+    lcd->print(bufDes);
+    lcd->print("PWM");
 }
 
 // ============================================================
@@ -518,9 +559,7 @@ void setup() {
   setupMotor();
 
   // LCD I2C initialization (SDA=LCD_SDA_PIN, SCL=LCD_SCL_PIN)
-  Wire.begin(LCD_SDA_PIN, LCD_SCL_PIN);
-  lcd.init();
-  lcd.backlight();
+  initLCD();
   lcdShowWelcome();
   pendingVelocity = motorVelocity;
 
