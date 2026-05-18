@@ -59,7 +59,7 @@ unsigned long lastButtonDebounce = 0;
 const unsigned long BUTTON_DEBOUNCE_MS = 200;
 
 // --- EMERGENCY STOP BUTTON (PIN 34) ---
-#define EMERGENCY_STOP_PIN 34
+// Nota: El pin 34 requiere resistencia pull-up externa de 10kΩ a 3.3V
 volatile bool emergencyStopActive = false;
 unsigned long lastEmergencyDebounce = 0;
 const unsigned long EMERGENCY_DEBOUNCE_MS = 100;
@@ -194,7 +194,7 @@ void setupMotor() {
   attachInterrupt(digitalPinToInterrupt(ENCODER_SW_PIN),  onEncoderButton,    FALLING);
 
   // Emergency Stop Button (pin 34 - no internal pull-up)
-  pinMode(EMERGENCY_STOP_PIN, INPUT);
+  pinMode(EMERGENCY_STOP_PIN, INPUT);  // Pin 34 no soporta pull-up interno
   attachInterrupt(digitalPinToInterrupt(EMERGENCY_STOP_PIN), onEmergencyStop, FALLING);
 
   // Estado inicial motor
@@ -512,8 +512,8 @@ void setup() {
 
   setupMotor();
 
-  // LCD I2C initialization (SDA=21, SCL=22)
-  Wire.begin(21, 22);
+  // LCD I2C initialization (SDA=LCD_SDA_PIN, SCL=LCD_SCL_PIN)
+  Wire.begin(LCD_SDA_PIN, LCD_SCL_PIN);
   lcd.init();
   lcd.backlight();
   lcdShowWelcome();

@@ -13,6 +13,13 @@
 #define ENCODER_DT_PIN  19
 #define ENCODER_SW_PIN  23
 
+// --- PINES LCD 16x2 I2C ---
+#define LCD_SDA_PIN 21
+#define LCD_SCL_PIN 22
+
+// --- PIN DE PARADA DE EMERGENCIA ---
+#define EMERGENCY_STOP_PIN 34
+
 // --- CONFIGURACIÓN PWM ---
 #define PWM_FREQUENCY  20000
 #define PWM_RESOLUTION 10          // 10 bits → valores 0-1023

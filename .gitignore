@@ -1,39 +1,42 @@
 ```
-# PlatformIO specific ignores
-.piolibdeps/
-.platformio/
-*.elf
-*.hex
-*.bin
-*.map
-*.lst
-
-# Build artifacts
+# Compiled and build artifacts
+*.o
+*.obj
+*.out
 build/
 dist/
-.sconsign.dblite
-.pioenvs/
 
-# IDE files
+# Dependencies
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Logs and temp files
-*.log
-*.tmp
+# Coverage
+coverage/
+htmlcov/
+.coverage
 
-# Environment files
-.env
-.env.local
-*.env.*
-
-# Python related (if applicable)
-__pycache__/
-*.pyc
-*.pyo
-.Python
-*.so
-*.egg-info/
+# OS generated files
+.DS_Store
+Thumbs.db
 ```
