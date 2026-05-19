@@ -50,20 +50,16 @@ tr:hover{background-color:#f8f9fa}
 
   <div class="metrics-grid">
     <div class="metric-card">
-      <div class="metric-label">RPM</div>
-      <div class="metric-value text-cyan"><span id="mRpm">0</span></div>
+      <div class="metric-label">Velocidad deseada</div>
+      <div class="metric-value"><span id="valVelTarget">0.000</span> <span class="unit">/1.900</span></div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">Velocidad</div>
-      <div class="metric-value text-cyan"><span id="mSpd">0</span> <span class="unit">mm/s</span></div>
+      <div class="metric-label">Velocidad actual</div>
+      <div class="metric-value text-cyan"><span id="mSpd">0.000</span> <span class="unit">m/s</span></div>
     </div>
     <div class="metric-card">
       <div class="metric-label">Corriente</div>
       <div class="metric-value text-amber"><span id="mCur">0.00</span> <span class="unit">A</span></div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-label">PWM</div>
-      <div class="metric-value"><span id="mPwm">0</span> <span class="unit">/1023</span></div>
     </div>
   </div>
 
@@ -80,15 +76,12 @@ tr:hover{background-color:#f8f9fa}
         <thead>
           <tr>
             <th>Hora</th>
-            <th>RPM</th>
-            <th>mm/s</th>
+            <th>m/s</th>
             <th>A</th>
-            <th>PWM</th>
-            <th>Dir</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td colspan="6" class="empty-msg">Esperando datos...</td></tr>
+          <tr><td colspan="3" class="empty-msg">Esperando datos...</td></tr>
         </tbody>
       </table>
     </div>
@@ -136,10 +129,11 @@ function wsConnect() {
 }
 
 function updateMetrics(d) {
-  if (d.rpm !== undefined)       document.getElementById('mRpm').textContent = (+d.rpm).toFixed(0);
-  if (d.speed_mm_s !== undefined)document.getElementById('mSpd').textContent = (+d.speed_mm_s).toFixed(1);
-  if (d.current !== undefined)   document.getElementById('mCur').textContent = (+d.current).toFixed(2);
-  if (d.velocity !== undefined)  document.getElementById('mPwm').textContent = d.velocity;
+  if (d.rpm !== undefined)        document.getElementById('mRpm').textContent = (+d.rpm).toFixed(0);
+  if (d.speed_m_s !== undefined)  document.getElementById('mSpd').textContent = (+d.speed_m_s).toFixed(3);
+  else if (d.speed_mm_s !== undefined) document.getElementById('mSpd').textContent = (+d.speed_mm_s / 1000.0).toFixed(3);
+  if (d.current !== undefined)    document.getElementById('mCur').textContent = (+d.current).toFixed(2);
+  if (d.velocity !== undefined)   document.getElementById('mPwm').textContent = d.velocity;
 }
 
 function addToHistory(d) {
@@ -151,7 +145,7 @@ function addToHistory(d) {
   const row = {
     time: timeStr,
     rpm: (+d.rpm).toFixed(0),
-    speed: (+d.speed_mm_s || 0).toFixed(1),
+    speed: d.speed_m_s !== undefined ? (+d.speed_m_s).toFixed(3) : (+d.speed_mm_s / 1000.0 || 0).toFixed(3),
     current: (+d.current || 0).toFixed(2),
     pwm: d.velocity || 0,
     dir: (d.direction >= 0) ? 'FWD' : 'REV'
@@ -166,7 +160,7 @@ function addToHistory(d) {
 function renderTable() {
   const tbody = document.querySelector('#history-table tbody');
   if (historyData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">Esperando datos...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" class="empty-msg">Esperando datos...</td></tr>';
     return;
   }
 
@@ -175,11 +169,8 @@ function renderTable() {
     html += `
       <tr>
         <td>${item.time}</td>
-        <td>${item.rpm}</td>
         <td>${item.speed}</td>
         <td>${item.current}</td>
-        <td>${item.pwm}</td>
-        <td>${item.dir}</td>
       </tr>
     `;
   });
@@ -195,10 +186,10 @@ function downloadCSV() {
   if (historyData.length === 0) return;
   
   let csvContent = "data:text/csv;charset=utf-8,";
-  csvContent += "Hora,RPM,mm/s,A,PWM,Dir\n";
+  csvContent += "Hora,m/s,A\n";
   
   historyData.forEach(row => {
-    csvContent += `${row.time},${row.rpm},${row.speed},${row.current},${row.pwm},${row.dir}\n`;
+    csvContent += `${row.time},${row.speed},${row.current}\n`;
   });
 
   const encodedUri = encodeURI(csvContent);

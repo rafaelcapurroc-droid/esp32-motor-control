@@ -22,10 +22,26 @@
 
 // --- CONFIGURACIÓN PWM ---
 #define PWM_FREQUENCY  20000
-#define PWM_RESOLUTION 10          // 10 bits → valores 0-1023
+#define PWM_RESOLUTION 11          // 11 bits → valores 0-2047
 #define PWM_CHANNEL    0
 #define MIN_VELOCITY   0
-#define MAX_VELOCITY   1023        // Rango real: 10-bit PWM
+#define MAX_VELOCITY   2047        // Rango real: 11-bit PWM
+
+// --- WIFI Y RED ---
+#define WIFI_SSID        "ESP32_Motor_Control"
+#define WIFI_AP_PASSWORD "12345678"
+
+// --- TIEMPOS DE CONTROL ---
+#define WS_SEND_INTERVAL       200
+#define CURRENT_READ_INTERVAL  50
+#define DEBUG_INTERVAL         1000
+#define ENCODER_DEBOUNCE_MS    5
+#define BUTTON_DEBOUNCE_MS     200
+#define EMERGENCY_DEBOUNCE_MS  100
+#define LCD_UPDATE_INTERVAL    200
+
+// --- PINES DE SISTEMA ---
+#define LED_BUILTIN_PIN 2
 
 // --- SENSOR DE CORRIENTE ---
 #define CS_VOLTAGE_PER_AMP  0.14f
@@ -36,12 +52,14 @@
 #define DRIVE_ROLLER_DIAMETER_MM 36.0f  // Rodillo motriz de la cinta
 #define PULLEY_DIAMETER_MM   60.0f      // Polea sensora (eje motriz)
 
-// --- CONFIGURACIÓN DE TRANSMISIÓN ---
-#define MOTOR_PULLEY_TEETH   20
-#define AXIS_PULLEY_TEETH    60
-#define TRANSMISSION_RATIO   ((float)MOTOR_PULLEY_TEETH / AXIS_PULLEY_TEETH)
-#define MOTOR_RPM_MAX        2400.0f
-#define AXIS_RPM_MAX         (MOTOR_RPM_MAX * TRANSMISSION_RATIO)
+#define HALL_CONST_RPM   (60000000.0f / MAGNETS_COUNT)
+#define HALL_CONST_SPEED ((3.14159265f * DRIVE_ROLLER_DIAMETER_MM * 1000.0f) / MAGNETS_COUNT)
+
+// --- PID ---
+#define PID_KP 2.5f
+#define PID_KI 5.0f
+#define PID_KD 0.2f
+#define MAX_SPEED_MS 5.0f
 
 // --- CONFIGURACIÓN ENCODER ---
 #define ENCODER_STEPS_PER_NOTCH 4
