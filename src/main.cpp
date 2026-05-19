@@ -42,10 +42,9 @@ float pidOutput   = 0.0f;          // Salida PID (PWM)
 QuickPID myPID(&currentLinearSpeedMs, &pidOutput, &pidSetpoint);
 
 // --- ENCODER ---
-volatile int encoderPosition = 0;
-unsigned long lastEncoderReadTime = 0;
+volatile int  encoderPosition      = 0;
 volatile bool encoderButtonPressed = false;
-unsigned long lastButtonDebounce = 0;
+volatile int64_t lastButtonDebounce  = 0;
 
 // --- EMERGENCY STOP ---
 volatile bool emergencyStopActive = false;
@@ -108,25 +107,42 @@ void IRAM_ATTR onHallSensorTrigger() {
 }
 
 void IRAM_ATTR onEncoderInterrupt() {
-    unsigned long now = millis();
-    if (now - lastEncoderReadTime < ENCODER_DEBOUNCE_MS) return;
-    lastEncoderReadTime = now;
-    int clk = digitalRead(ENCODER_CLK_PIN);
-    int dt  = digitalRead(ENCODER_DT_PIN);
-    if (clk == LOW) {
-        if (dt == HIGH) {
-            pendingVelocity += ENCODER_VELOCITY_STEP;
-        } else {
-            pendingVelocity -= ENCODER_VELOCITY_STEP;
-        }
+    static uint8_t lastState   = 0b11;
+    static int8_t  accumulator = 0;
+
+    uint8_t clk   = digitalRead(ENCODER_CLK_PIN);
+    uint8_t dt    = digitalRead(ENCODER_DT_PIN);
+    uint8_t state = (clk << 1) | dt;
+
+    if (state == lastState) return;
+
+    if ((lastState == 0b11 && state == 0b01) ||
+        (lastState == 0b01 && state == 0b00) ||
+        (lastState == 0b00 && state == 0b10) ||
+        (lastState == 0b10 && state == 0b11)) {
+        accumulator++;
+    } else {
+        accumulator--;
     }
+
+    lastState = state;
+
+    // Aplicar el step solo cuando se completa un detent (ENCODER_STEPS_PER_NOTCH transiciones)
+    if (accumulator >= ENCODER_STEPS_PER_NOTCH) {
+        accumulator = 0;
+        pendingVelocity += ENCODER_VELOCITY_STEP;
+    } else if (accumulator <= -ENCODER_STEPS_PER_NOTCH) {
+        accumulator = 0;
+        pendingVelocity -= ENCODER_VELOCITY_STEP;
+    }
+
     if (pendingVelocity > MAX_VELOCITY) pendingVelocity = MAX_VELOCITY;
     if (pendingVelocity < 0)            pendingVelocity = 0;
 }
 
 void IRAM_ATTR onEncoderButton() {
-    unsigned long now = millis();
-    if (now - lastButtonDebounce < BUTTON_DEBOUNCE_MS) return;
+    int64_t now = esp_timer_get_time();
+    if (now - lastButtonDebounce < (BUTTON_DEBOUNCE_MS * 1000LL)) return;
     lastButtonDebounce   = now;
     encoderButtonPressed = true;
 }
@@ -199,7 +215,8 @@ void setupMotor() {
     pinMode(ENCODER_CLK_PIN, INPUT_PULLUP);
     pinMode(ENCODER_DT_PIN,  INPUT_PULLUP);
     pinMode(ENCODER_SW_PIN,  INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(ENCODER_CLK_PIN), onEncoderInterrupt, FALLING);
+    attachInterrupt(digitalPinToInterrupt(ENCODER_CLK_PIN), onEncoderInterrupt, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENCODER_DT_PIN),  onEncoderInterrupt, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENCODER_SW_PIN),  onEncoderButton,    FALLING);
 
     pinMode(EMERGENCY_STOP_PIN, INPUT);
@@ -252,6 +269,7 @@ void updateMotor() {
         encoderPosition   = pendingVelocity;
         // Al confirmar con el encoder, actualizamos el setpoint del PID inmediatamente
         pidSetpoint = ((float)targetSetpointPWM / (float)MAX_VELOCITY) * MAX_SPEED_MS;
+        broadcastState();
     }
 
     if (targetSetpointPWM == 0) {
@@ -364,7 +382,7 @@ void updateLCD() {
     lcd->setCursor(1, 1);
     if (pendingVelocity != targetSetpointPWM) {
         float previewSpeed = ((float)pendingVelocity / (float)MAX_VELOCITY) * MAX_SPEED_MS;
-        lcd->print("Pre:");
+        lcd->print("EDT:");
         char bufPre[12];
         snprintf(bufPre, sizeof(bufPre), "%-5.2f*", previewSpeed);
         lcd->print(bufPre);
@@ -417,13 +435,13 @@ void onWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
                 if (spd < 0.0f) spd = 0.0f;
                 if (spd > MAX_SPEED_MS) spd = MAX_SPEED_MS;
                 
-                pidSetpoint = spd;
                 int pwm = (int)(((spd / MAX_SPEED_MS) * (float)MAX_VELOCITY) + 0.5f);
                 pwm = constrain(pwm, 0, MAX_VELOCITY);
                 
+                pidSetpoint       = spd;
                 targetSetpointPWM = pwm;
-                encoderPosition = pwm;
-                pendingVelocity = pwm;
+                encoderPosition   = pwm;
+                pendingVelocity   = pwm;  // sincronizar para que LCD no muestre EDT:
                 stateChanged = true;
                 
             } else if (doc.containsKey("speed_mm_s")) {
@@ -431,13 +449,13 @@ void onWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
                 if (spd < 0.0f) spd = 0.0f;
                 if (spd > MAX_SPEED_MS) spd = MAX_SPEED_MS;
                 
-                pidSetpoint = spd;
                 int pwm = (int)(((spd / MAX_SPEED_MS) * (float)MAX_VELOCITY) + 0.5f);
                 pwm = constrain(pwm, 0, MAX_VELOCITY);
                 
+                pidSetpoint       = spd;
                 targetSetpointPWM = pwm;
-                encoderPosition = pwm;
-                pendingVelocity = pwm;
+                encoderPosition   = pwm;
+                pendingVelocity   = pwm;  // sincronizar para que LCD no muestre EDT:
                 stateChanged = true;
             }
             
