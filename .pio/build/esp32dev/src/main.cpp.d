@@ -210,4 +210,4 @@
  C:/Users/Rafa/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.h \
  C:/Users/Rafa/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h \
  .pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.h \
- .pio/libdeps/esp32dev/QuickPID/src/QuickPID.h include/motor_config.h
+ include/motor_config.h
