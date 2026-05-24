@@ -1,3 +1,5 @@
-esphome/ESPAsyncWebServer-esphome@^3.4.0
-marcoschwartz/LiquidCrystal_I2C@^1.1.4
+dlloydev/QuickPID@^3.1.9
 bblanchon/ArduinoJson@^7.4.3
+marcoschwartz/LiquidCrystal_I2C@^1.1.4
+esphome/ESPAsyncWebServer-esphome@^3.4.0
+madhephaestus/ESP32Encoder@^0.12.0
