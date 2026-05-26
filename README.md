@@ -35,7 +35,17 @@ Control complete de motor DC con VNH5019 Pololu mediante **Servidor Web WiFi con
 
 ---
 
-## 🚀 Quick Start
+## � Documentación
+
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Arquitectura general y guía de desarrollo
+- **[README_WIFI.md](docs/README_WIFI.md)** - Configuración WiFi en detalle
+- **[PIN_ANALYSIS.md](docs/PIN_ANALYSIS.md)** - Análisis de pines y configuración hardware
+- **[BLE_PROTOCOL.md](docs/BLE_PROTOCOL.md)** - Especificación protocolo BLE
+- **[MOBILE_APP_GUIDE.md](docs/MOBILE_APP_GUIDE.md)** - Guía desarrollo app móvil
+
+---
+
+## �🚀 Quick Start
 
 ### 1. Compilar y Cargar
 

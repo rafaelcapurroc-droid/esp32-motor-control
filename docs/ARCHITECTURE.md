@@ -37,11 +37,12 @@ Browser (http://192.168.4.1)
 
 ### Key Files
 - **src/main.cpp**: WiFi server + motor control firmware
-- **include/web_pages.h**: HTML/CSS/JS embedded
 - **include/wifi_config.h**: WiFi SSID/password configuration
 - **include/motor_config.h**: GPIO pin definitions
 - **README.md**: Quick start & full documentation
-- **README_WIFI.md**: Detailed WiFi setup guide
+- **docs/README_WIFI.md**: Detailed WiFi setup guide
+- **docs/PIN_ANALYSIS.md**: Hardware pin configuration
+- **docs/BLE_PROTOCOL.md**: BLE communication specification
 
 ### WiFi Configuration
 Edit `include/wifi_config.h`:
@@ -83,10 +84,10 @@ GND ────────→ VNH5019 GND
    - WebSocket handling: `onWebSocketEvent()`
    - HTTP endpoints: `setupHTTPEndpoints()`
 
-2. **Modify web interface** in `include/web_pages.h`
-   - HTML layout: `HTML_PAGE` constant
-   - CSS styling: `CSS_STYLE` constant
-   - JavaScript logic: `JS_SCRIPT` constant
+2. **Modify web interface** in `data/` folder
+   - HTML layout: `data/index.html`
+   - CSS styling: included in HTML or separate file
+   - JavaScript logic: `data/js/` scripts
 
 3. **Configure hardware** in `include/motor_config.h`
    - GPIO pins, PWM frequency, current limits
@@ -199,30 +200,9 @@ pio device list
 
 ### Debugging Tips
 
-- **Browser console**: F12 → Console → See WebSocket messages
-- **Serial monitor**: `pio device monitor` → See ESP32 logs
-- **Network**: Chrome DevTools → Network → Inspect WebSocket frames
-- **Current calibration**: Measure with multimeter, compare to web display
-
----
-
-## Development Workflow Summary
-
-1. **Edit code** in `src/main.cpp` or `include/web_pages.h`
-2. **Build**: `pio run`
-3. **Upload**: `pio run --target upload` (with ESP32 connected)
-4. **Test**: Open `http://192.168.4.1` in browser
-5. **Debug**: `pio device monitor` (F12 in browser for console)
-6. **Repeat** until desired behavior is achieved
-
----
-
-**Use this guide** when:
-- Adding new web interface features
-- Modifying motor control logic
-- Debugging WebSocket communication
-- Adjusting WiFi settings
-- Calibrating current sensor
-- Optimizing performance
-- Adding new API endpoints
-- Testing with multiple clients
+- Check serial output for errors (baud 115200)
+- Verify WiFi credentials in `include/wifi_config.h`
+- Confirm GPIO pins match `include/motor_config.h`
+- Monitor WebSocket in browser DevTools (F12 → Console)
+- Test with multimeter if motor not responding
+- Check power supply voltage (3.3V for ESP32, 12V+ for motor)
