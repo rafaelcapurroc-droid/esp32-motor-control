@@ -748,7 +748,7 @@ void setup() {
   pendingSetpoint     = 0.0f;
   setpointPending     = false;
 
-  Serial.println("[ENCODER] Inicializado — HALF_QUAD, filtro máximo");
+  Serial.println("[ENCODER] Inicializado — HALF_QUAD");
 
   // Botón del encoder
   pinMode(ENCODER_SW_PIN, INPUT_PULLUP);
