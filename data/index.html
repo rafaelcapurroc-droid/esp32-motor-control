@@ -3,226 +3,334 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 - Control de Motor</title>
+    <title>ESP32 - Control Motor</title>
     <style>
-        :root {
-            --bg-color: #0d0f14;
-            --card-bg: #1e2330;
-            --text-color: #c8d0e0;
-            --accent-color: #00e5ff;
-            --warn-color: #ff6b35;
-            --success-color: #39ff6e;
-            --danger-color: #ff3355;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f0f2f5; 
+            color: #333; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            padding: 16px;
+            user-select: none;
         }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        h1 { color: var(--accent-color); margin-bottom: 10px; }
-        .status-bar {
+
+        .container { 
             width: 100%;
-            max-width: 600px;
+            max-width: 480px;
+        }
+
+        /* Header */
+        header {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 20px;
-            font-size: 0.9em;
-            color: #888;
-        }
-        #ws-status { font-weight: bold; }
-        .connected { color: var(--success-color) !important; }
-        .disconnected { color: var(--danger-color) !important; }
-
-        .dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            width: 100%;
-            max-width: 600px;
-            margin-bottom: 20px;
-        }
-        .card {
-            background-color: var(--card-bg);
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        .card h3 { margin: 0 0 10px 0; font-size: 0.9em; color: #888; }
-        .card .value { font-size: 1.8em; font-weight: bold; color: var(--accent-color); }
-        .card .unit { font-size: 0.8em; color: #666; }
-
-        .controls {
-            width: 100%;
-            max-width: 600px;
-            background-color: var(--card-bg);
-            padding: 20px;
-            border-radius: 8px;
-        }
-        .slider-container { margin: 20px 0; }
-        input[type=range] {
-            width: 100%;
-            height: 10px;
-            border-radius: 5px;
-            background: #333;
-            outline: none;
-        }
-        .buttons {
-            display: flex;
+            align-items: center;
+            background: #fff;
+            padding: 12px 16px;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.08);
+            margin-bottom: 14px;
+            flex-wrap: wrap;
             gap: 10px;
-            justify-content: center;
-            margin-top: 20px;
         }
-        button {
-            padding: 12px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.1s;
+
+        header h2 {
+            font-size: 1.1rem;
+            color: #444;
+            font-weight: 600;
         }
-        button:active { transform: scale(0.95); }
-        .btn-fwd { background-color: var(--accent-color); color: #000; }
-        .btn-rev { background-color: var(--warn-color); color: #000; }
-        .btn-stop { background-color: var(--danger-color); color: #fff; }
-        
-        .monitor-link {
-            margin-top: 20px;
-            color: var(--accent-color);
+
+        .status {
+            font-weight: 700;
+            font-size: .85rem;
+        }
+        .connected { color: #28a745; }
+        .disconnected { color: #dc3545; }
+
+        .link-monitor {
+            background: #007bff;
+            color: #fff;
+            padding: 7px 16px;
+            border-radius: 6px;
             text-decoration: none;
-            border: 1px solid var(--accent-color);
-            padding: 8px 16px;
-            border-radius: 4px;
+            font-size: .85rem;
+            font-weight: 600;
+        }
+        .link-monitor:hover { background: #0056b3; }
+
+        /* Data grid */
+        .data-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 12px; 
+            margin-bottom: 14px;
+        }
+
+        .data-card { 
+            background: #fff;
+            padding: 14px;
+            border-radius: 10px; 
+            box-shadow: 0 1px 4px rgba(0,0,0,.08);
+            text-align: center;
+        }
+
+        .data-label { 
+            font-size: .72rem; 
+            color: #888; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: block; 
+            margin-bottom: 4px;
+        }
+
+        .data-value { 
+            font-size: 1.7rem; 
+            font-weight: 700; 
+            line-height: 1.2;
+            color: #17a2b8; /* cyan del monitor */
+        }
+
+        .data-value.amber {
+            color: #fd7e14;
+        }
+
+        .data-value.neutral {
+            color: #444;
+        }
+
+        .unit { 
+            font-size: .85rem; 
+            color: #999; 
+            font-weight: 400;
+        }
+
+        /* Control section */
+        .control-section { 
+            background: #fff;
+            padding: 18px;
+            border-radius: 10px; 
+            box-shadow: 0 1px 4px rgba(0,0,0,.08);
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .control-header h3 {
+            font-size: 1rem;
+            color: #444;
+            font-weight: 600;
+        }
+
+        /* Grid de botones grandes */
+        .btn-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 12px; 
+            margin-bottom: 14px;
+        }
+
+        button { 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 700; 
+            transition: transform 0.1s, background 0.15s, box-shadow 0.1s; 
+            color: white;
+            touch-action: manipulation;
+        }
+
+        button:active {
+            transform: scale(0.97);
+        }
+
+        /* Botones de ajuste */
+        .btn-adjust { 
+            padding: 22px 10px; 
+            font-size: 1.1rem; 
+            background-color: #007bff;
+            box-shadow: 0 3px 0 #0056b3;
+        }
+        .btn-adjust:hover { background-color: #0056b3; }
+        .btn-adjust:active { 
+            box-shadow: 0 1px 0 #0056b3; 
+            transform: translateY(2px) scale(1); 
+        }
+
+        /* Botón STOP */
+        .btn-stop { 
+            width: 100%;
+            padding: 18px; 
+            font-size: 1.3rem; 
+            background-color: #dc3545;
+            box-shadow: 0 3px 0 #a71d2a;
+        }
+        .btn-stop:hover { background-color: #c82333; }
+        .btn-stop:active { 
+            box-shadow: 0 1px 0 #a71d2a; 
+            transform: translateY(2px) scale(1); 
         }
     </style>
 </head>
 <body>
 
-    <h1>ESP32 - Control</h1>
-    
-    <div class="status-bar">
-        <span id="ws-status" class="disconnected">Desconectado</span>
-        <a href="/monitor.html" class="monitor-link">Ir a Monitoreo</a>
-    </div>
+<div class="container">
 
-    <div class="dashboard">
-        <div class="card">
-            <h3>Velocidad Cinta</h3>
-            <span class="value" id="disp-speed">0.000</span>
+    <!-- Header igual al monitor -->
+    <header>
+        <h2>ESP32 - Control Motor</h2>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <div id="connectionStatus" class="status disconnected">Desconectado</div>
+            <a href="/monitor.html" class="link-monitor">Monitoreo</a>
+        </div>
+    </header>
+
+    <!-- Cards de datos -->
+    <div class="data-grid">
+        <div class="data-card">
+            <span class="data-label">Objetivo</span>
+            <span class="data-value" id="targetSpeedDisplay">0.000</span>
             <span class="unit">m/s</span>
         </div>
-        <div class="card">
-            <h3>RPM Eje</h3>
-            <span class="value" id="disp-rpm">0</span>
-            <span class="unit">RPM</span>
+        <div class="data-card">
+            <span class="data-label">Real</span>
+            <span class="data-value" id="actualSpeedDisplay">0.000</span>
+            <span class="unit">m/s</span>
         </div>
-        <div class="card">
-            <h3>Corriente</h3>
-            <span class="value" id="disp-current">0.00</span>
+        <div class="data-card">
+            <span class="data-label">Corriente</span>
+            <span class="data-value amber" id="currentDisplay">0.00</span>
             <span class="unit">A</span>
         </div>
-        <div class="card">
-            <h3>PWM</h3>
-            <span class="value" id="disp-pwm">0</span>
-            <span class="unit">/ 1023</span>
+        <div class="data-card">
+            <span class="data-label">PWM</span>
+            <span class="data-value neutral" id="ledStatus">0</span>
+            <span class="unit">/1023</span>
         </div>
     </div>
 
-    <div class="controls">
-        <div class="slider-container">
-            <label for="speed-slider">Velocidad (PWM): <span id="slider-val">0</span></label>
-            <input type="range" id="speed-slider" min="0" max="1023" value="0">
+    <!-- Sección de control -->
+    <div class="control-section">
+        <div class="control-header">
+            <h3>Ajuste de Velocidad</h3>
         </div>
-        
-        <div class="buttons">
-            <button class="btn-fwd" onclick="setDirection(1)">Adelante</button>
-            <button class="btn-stop" onclick="stopMotor()">Detener</button>
-            <button class="btn-rev" onclick="setDirection(-1)">Atrás</button>
-        </div>
-    </div>
 
-    <script>
-        let ws;
-        const wsStatus = document.getElementById('ws-status');
-        const speedSlider = document.getElementById('speed-slider');
-        const sliderVal = document.getElementById('slider-val');
-
-        // Elementos de visualización
-        const dispSpeed = document.getElementById('disp-speed');
-        const dispRpm = document.getElementById('disp-rpm');
-        const dispCurrent = document.getElementById('disp-current');
-        const dispPwm = document.getElementById('disp-pwm');
-
-        function connectWS() {
-            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${location.host}/ws`;
+        <div class="btn-grid">
+            <button class="btn-adjust" onclick="adjustSpeed(-0.5)">− 0.5</button>
+            <button class="btn-adjust" onclick="adjustSpeed(+0.5)">+ 0.5</button>
             
-            ws = new WebSocket(wsUrl);
+            <button class="btn-adjust" onclick="adjustSpeed(-0.1)">− 0.1</button>
+            <button class="btn-adjust" onclick="adjustSpeed(+0.1)">+ 0.1</button>
+        </div>
 
-            ws.onopen = () => {
-                wsStatus.textContent = "Conectado";
-                wsStatus.className = "connected";
-            };
+        <button class="btn-stop" onclick="stopMotor()">STOP</button>
+    </div>
 
-            ws.onclose = () => {
-                wsStatus.textContent = "Desconectado";
-                wsStatus.className = "disconnected";
-                setTimeout(connectWS, 2000); // Reintentar conexión
-            };
+</div>
 
-            ws.onmessage = (event) => {
+<script>
+    let ws;
+    let isUpdatingFromWS = false; 
+    const MAX_SPEED_MS = 1.9;
+
+    function connectWS() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUri = `${protocol}//${window.location.hostname}/ws`;
+        
+        ws = new WebSocket(wsUri);
+
+        ws.onopen = function() {
+            document.getElementById('connectionStatus').textContent = 'Conectado';
+            document.getElementById('connectionStatus').className = 'status connected';
+            console.log("WebSocket Conectado");
+        };
+
+        ws.onclose = function() {
+            document.getElementById('connectionStatus').textContent = 'Desconectado';
+            document.getElementById('connectionStatus').className = 'status disconnected';
+            console.log("WebSocket Desconectado. Reconectando...");
+            setTimeout(connectWS, 2000);
+        };
+
+        ws.onmessage = function(event) {
+            try {
                 const data = JSON.parse(event.data);
-                updateMetrics(data);
-            };
+                updateUI(data);
+            } catch (e) {
+                console.error("Error parsing JSON:", e);
+            }
+        };
+    }
+
+    function updateUI(data) {
+        // Velocidad real — campo correcto del ESP32
+        if (data.speed_m_s !== undefined) {
+            document.getElementById('actualSpeedDisplay').textContent = parseFloat(data.speed_m_s).toFixed(3);
         }
 
-        function updateMetrics(data) {
-            if (data.speed_m_s !== undefined) {
-                dispSpeed.textContent = parseFloat(data.speed_m_s).toFixed(3);
-            }
-            if (data.rpm !== undefined) {
-                dispRpm.textContent = parseFloat(data.rpm).toFixed(0);
-            }
-            if (data.current !== undefined) {
-                dispCurrent.textContent = parseFloat(data.current).toFixed(2);
-            }
-            if (data.velocity !== undefined) {
-                dispPwm.textContent = data.velocity;
-                // Solo actualizar slider si no está siendo arrastrado por el usuario
-                if (document.activeElement !== speedSlider) {
-                    speedSlider.value = data.velocity;
-                    sliderVal.textContent = data.velocity;
-                }
+        // Corriente
+        if (data.current !== undefined) {
+            document.getElementById('currentDisplay').textContent = parseFloat(data.current).toFixed(2);
+        }
+
+        // PWM — campo "velocity" del ESP32 (valor entero 0-1023)
+        if (data.velocity !== undefined) {
+            document.getElementById('ledStatus').textContent = data.velocity;
+        }
+
+        // Objetivo: si hay setpoint pendiente (encoder girando sin confirmar)
+        // se muestra sp_pending_m_s; si está confirmado, sp_m_s.
+        // Solo se actualiza desde el servidor, NO durante el envío local,
+        // para evitar sobreescribir mientras el usuario pulsa botones seguidos.
+        if (!isUpdatingFromWS) {
+            if (data.sp_pending_m_s !== undefined) {
+                const targetVal = data.sp_pending ? 
+                    parseFloat(data.sp_pending_m_s) : 
+                    parseFloat(data.sp_m_s);
+                document.getElementById('targetSpeedDisplay').textContent = targetVal.toFixed(3);
+            } else if (data.sp_m_s !== undefined) {
+                document.getElementById('targetSpeedDisplay').textContent = parseFloat(data.sp_m_s).toFixed(3);
             }
         }
 
-        function sendCommand(cmd) {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify(cmd));
-            }
+        isUpdatingFromWS = false;
+    }
+
+    function sendSpeed(speedMs) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            if (speedMs < 0) speedMs = 0;
+            if (speedMs > MAX_SPEED_MS) speedMs = MAX_SPEED_MS;
+
+            // El ESP32 espera el campo "sp" para aplicar y confirmar el setpoint
+            ws.send(JSON.stringify({ sp: parseFloat(speedMs.toFixed(3)) }));
+
+            // Feedback visual inmediato — marcamos flag para no sobreescribir
+            // con el echo del servidor hasta el próximo ciclo
+            isUpdatingFromWS = true;
+            document.getElementById('targetSpeedDisplay').textContent = speedMs.toFixed(3);
         }
+    }
 
-        speedSlider.addEventListener('input', (e) => {
-            const val = e.target.value;
-            sliderVal.textContent = val;
-            sendCommand({ velocity: parseInt(val) });
-        });
+    function adjustSpeed(delta) {
+        let currentVal = parseFloat(document.getElementById('targetSpeedDisplay').textContent);
+        let newVal = currentVal + delta;
+        sendSpeed(newVal);
+    }
 
-        function setDirection(dir) {
-            sendCommand({ direction: dir });
-        }
+    function stopMotor() {
+        sendSpeed(0);
+    }
 
-        function stopMotor() {
-            sendCommand({ velocity: 0 });
-        }
+    connectWS();
+</script>
 
-        // Iniciar conexión
-        window.onload = connectWS;
-    </script>
 </body>
 </html>
