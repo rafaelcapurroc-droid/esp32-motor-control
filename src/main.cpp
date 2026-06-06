@@ -204,6 +204,13 @@ static void activarPID(float sp) {
   // Activar PID en automático con pidOutput precargado
   myPID.SetMode(QuickPID::Control::automatic);
 
+  // ========== AGREGAR AQUÍ LOS PRINTS ==========
+  Serial.printf("[PID] Modo: %s | SP: %.3f | Current: %.3f | Error: %.3f\n", 
+    (myPID.GetMode() == (uint8_t)QuickPID::Control::automatic) ? "AUTO" : "MANUAL",
+    setpointSpeed, currentLinearSpeedMs, setpointSpeed - currentLinearSpeedMs);
+  Serial.printf("[PID] Kp=%.2f Ki=%.2f Kd=%.2f\n", myPID.GetKp(), myPID.GetKi(), myPID.GetKd());
+  // ============================================
+
   applyPWM((int)pidOutput);
   Serial.printf("[PID] Activado — SP: %.3f m/s | FF PWM: %.0f\n", sp, pidOutput);
 }
@@ -820,6 +827,7 @@ void loop() {
 
   // Control PID
   static unsigned long ultimoControl = 0;
+  static unsigned long lastPidDebug = 0;
   if (ahora - ultimoControl >= CONTROL_INTERVAL_MS) {
     ultimoControl = ahora;
     calculateSpeed();
@@ -827,8 +835,16 @@ void loop() {
     // Compute() no hace nada en modo manual; en automático regula la velocidad
     myPID.Compute();
     applyPWM((int)round(pidOutput));
-  }
 
+      if (ahora - lastPidDebug > 2000) {
+    lastPidDebug = ahora;
+    if (setpointSpeed > 0 && myPID.GetMode() == (uint8_t)QuickPID::Control::automatic) {
+      float error = setpointSpeed - currentLinearSpeedMs;
+      Serial.printf("[PID DEBUG] SP:%.3f Curr:%.3f Err:%.3f Out:%.1f PWM:%d\n",
+        setpointSpeed, currentLinearSpeedMs, error, pidOutput, (int)round(pidOutput));
+      }
+    }
+  }
   updateCurrentReading();
 
   // WebSocket

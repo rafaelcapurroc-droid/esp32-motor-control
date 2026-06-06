@@ -1,0 +1,1 @@
+{"nodes": [{"id": "readme_wifi_md", "label": "WiFi Setup Guide", "file_type": "document", "source_file": "docs/README_WIFI.md"}], "edges": [{"source": "readme_wifi_md", "target": "wifi_config_h", "relation": "references", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "docs/README_WIFI.md"}], "hyperedges": []}

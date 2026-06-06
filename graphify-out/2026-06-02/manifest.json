@@ -1,0 +1,942 @@
+{
+  "C:\\Users\\Rafa\\esp32-motor-control\\.claude\\settings.local.json": {
+    "mtime": 1780444116.6008892,
+    "ast_hash": "82a4a6a8e19ddcbfec28d35bd4d9028e",
+    "semantic_hash": "82a4a6a8e19ddcbfec28d35bd4d9028e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\ArduinoJson.h": {
+    "mtime": 1780443783.9551013,
+    "ast_hash": "6bcb5025f8a05cf682db5762e2c06329",
+    "semantic_hash": "6bcb5025f8a05cf682db5762e2c06329"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\library.json": {
+    "mtime": 1780443783.964101,
+    "ast_hash": "70b5c51bed4f8b6629c5ceed59a4face",
+    "semantic_hash": "70b5c51bed4f8b6629c5ceed59a4face"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson.h": {
+    "mtime": 1780443783.9661002,
+    "ast_hash": "59957d16bd601fc1b236c838d9f32d1b",
+    "semantic_hash": "59957d16bd601fc1b236c838d9f32d1b"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson.hpp": {
+    "mtime": 1780443783.9661002,
+    "ast_hash": "e893e6162f2dab2dddb949f014959607",
+    "semantic_hash": "e893e6162f2dab2dddb949f014959607"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Array\\ArrayData.hpp": {
+    "mtime": 1780443783.9671001,
+    "ast_hash": "70beb4975409b21af72e2639ab4e9407",
+    "semantic_hash": "70beb4975409b21af72e2639ab4e9407"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Array\\ArrayImpl.hpp": {
+    "mtime": 1780443783.9681005,
+    "ast_hash": "af614fad094c3f693feb9428ab04365b",
+    "semantic_hash": "af614fad094c3f693feb9428ab04365b"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Array\\ElementProxy.hpp": {
+    "mtime": 1780443783.9681005,
+    "ast_hash": "539bcd7a35d3a2becc9276e41dd8b20e",
+    "semantic_hash": "539bcd7a35d3a2becc9276e41dd8b20e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Array\\JsonArray.hpp": {
+    "mtime": 1780443783.9691007,
+    "ast_hash": "c646fa573e044d1ebeb414765ecc4047",
+    "semantic_hash": "c646fa573e044d1ebeb414765ecc4047"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Array\\JsonArrayConst.hpp": {
+    "mtime": 1780443783.9691007,
+    "ast_hash": "ac75adaed40e678f4e1187b4986e05a1",
+    "semantic_hash": "ac75adaed40e678f4e1187b4986e05a1"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Array\\JsonArrayIterator.hpp": {
+    "mtime": 1780443783.9701004,
+    "ast_hash": "53db766c1d2e1a41cb22e70df2323e9d",
+    "semantic_hash": "53db766c1d2e1a41cb22e70df2323e9d"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Array\\Utilities.hpp": {
+    "mtime": 1780443783.9701004,
+    "ast_hash": "b79ea443478f8e669e286da396668e4d",
+    "semantic_hash": "b79ea443478f8e669e286da396668e4d"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Collection\\CollectionData.hpp": {
+    "mtime": 1780443783.9711,
+    "ast_hash": "b38321bc4856e4d84be3f0180cbd7dad",
+    "semantic_hash": "b38321bc4856e4d84be3f0180cbd7dad"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Collection\\CollectionImpl.hpp": {
+    "mtime": 1780443783.9711,
+    "ast_hash": "d117c5546fcfe452548202bde7c4fd12",
+    "semantic_hash": "d117c5546fcfe452548202bde7c4fd12"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Configuration.hpp": {
+    "mtime": 1780443783.9721005,
+    "ast_hash": "5307d6628e3cce12b6e8b4bbe184c03b",
+    "semantic_hash": "5307d6628e3cce12b6e8b4bbe184c03b"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\DeserializationError.hpp": {
+    "mtime": 1780443783.9731002,
+    "ast_hash": "3e8eb276226800af6c6d23193b3400d1",
+    "semantic_hash": "3e8eb276226800af6c6d23193b3400d1"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\DeserializationOptions.hpp": {
+    "mtime": 1780443783.9731002,
+    "ast_hash": "672f3e3da742f03956c19aec3d9fcda9",
+    "semantic_hash": "672f3e3da742f03956c19aec3d9fcda9"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\Filter.hpp": {
+    "mtime": 1780443783.9741,
+    "ast_hash": "c9494183453ac3387560ef1402236fdd",
+    "semantic_hash": "c9494183453ac3387560ef1402236fdd"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\NestingLimit.hpp": {
+    "mtime": 1780443783.9741,
+    "ast_hash": "8ccb420bc37afa057e678b40b4675018",
+    "semantic_hash": "8ccb420bc37afa057e678b40b4675018"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\Reader.hpp": {
+    "mtime": 1780443783.9751003,
+    "ast_hash": "3ad93d0ac0983ef5e8a18ca99db26e30",
+    "semantic_hash": "3ad93d0ac0983ef5e8a18ca99db26e30"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\Readers\\ArduinoStreamReader.hpp": {
+    "mtime": 1780443783.9761014,
+    "ast_hash": "9d3a05ed73b8d13778a2a1771aaa85eb",
+    "semantic_hash": "9d3a05ed73b8d13778a2a1771aaa85eb"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\Readers\\ArduinoStringReader.hpp": {
+    "mtime": 1780443783.9761014,
+    "ast_hash": "57180c0028dc861923387216cc919d0d",
+    "semantic_hash": "57180c0028dc861923387216cc919d0d"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\Readers\\FlashReader.hpp": {
+    "mtime": 1780443783.9781008,
+    "ast_hash": "0d6313c20c0ac63fdc6bcfe7a96d9616",
+    "semantic_hash": "0d6313c20c0ac63fdc6bcfe7a96d9616"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\Readers\\IteratorReader.hpp": {
+    "mtime": 1780443783.9791007,
+    "ast_hash": "a2efabae7329c549478f7d811e376b7a",
+    "semantic_hash": "a2efabae7329c549478f7d811e376b7a"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\Readers\\RamReader.hpp": {
+    "mtime": 1780443783.9791007,
+    "ast_hash": "e6c8e90bf1b2b8d5c4507a57cc608716",
+    "semantic_hash": "e6c8e90bf1b2b8d5c4507a57cc608716"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\Readers\\StdStreamReader.hpp": {
+    "mtime": 1780443783.9801004,
+    "ast_hash": "c5dfb309bf96c85eb36bfa136d1c849b",
+    "semantic_hash": "c5dfb309bf96c85eb36bfa136d1c849b"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\Readers\\VariantReader.hpp": {
+    "mtime": 1780443783.9801004,
+    "ast_hash": "a4e21e0caa6bea0ad6807d98e45e9681",
+    "semantic_hash": "a4e21e0caa6bea0ad6807d98e45e9681"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Deserialization\\deserialize.hpp": {
+    "mtime": 1780443783.9811008,
+    "ast_hash": "13e97dc516038b02ed2c48ec6c7670ce",
+    "semantic_hash": "13e97dc516038b02ed2c48ec6c7670ce"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Document\\JsonDocument.hpp": {
+    "mtime": 1780443783.982101,
+    "ast_hash": "9ffc2d7c9b2c21c8533034c189c26dc6",
+    "semantic_hash": "9ffc2d7c9b2c21c8533034c189c26dc6"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Json\\EscapeSequence.hpp": {
+    "mtime": 1780443783.983101,
+    "ast_hash": "f011fedb43c74b960c1eb85f4229be7e",
+    "semantic_hash": "f011fedb43c74b960c1eb85f4229be7e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Json\\JsonDeserializer.hpp": {
+    "mtime": 1780443783.983101,
+    "ast_hash": "05fdb2b8111511eef2f1e2823d5fde2f",
+    "semantic_hash": "05fdb2b8111511eef2f1e2823d5fde2f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Json\\JsonSerializer.hpp": {
+    "mtime": 1780443783.9851,
+    "ast_hash": "a6c74a6a68ed65e14ec2039845fd770d",
+    "semantic_hash": "a6c74a6a68ed65e14ec2039845fd770d"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Json\\Latch.hpp": {
+    "mtime": 1780443783.9851,
+    "ast_hash": "3f5d9151dda5e3500fc21a859001e5fb",
+    "semantic_hash": "3f5d9151dda5e3500fc21a859001e5fb"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Json\\PrettyJsonSerializer.hpp": {
+    "mtime": 1780443783.9861007,
+    "ast_hash": "64dba79eb53bc42edc4de2396ffe8d69",
+    "semantic_hash": "64dba79eb53bc42edc4de2396ffe8d69"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Json\\TextFormatter.hpp": {
+    "mtime": 1780443783.9861007,
+    "ast_hash": "5538caf9dfbefc4bfec02364e2329c90",
+    "semantic_hash": "5538caf9dfbefc4bfec02364e2329c90"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Json\\Utf16.hpp": {
+    "mtime": 1780443783.9871006,
+    "ast_hash": "02d6d3f31b3e8a8b0ad8aa8c7948c44c",
+    "semantic_hash": "02d6d3f31b3e8a8b0ad8aa8c7948c44c"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Json\\Utf8.hpp": {
+    "mtime": 1780443783.9871006,
+    "ast_hash": "98f5dcbff9b754c8fee60d6d67170dd9",
+    "semantic_hash": "98f5dcbff9b754c8fee60d6d67170dd9"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\Alignment.hpp": {
+    "mtime": 1780443783.9881003,
+    "ast_hash": "2817a0d52d49cd8c6edc904e44b695fe",
+    "semantic_hash": "2817a0d52d49cd8c6edc904e44b695fe"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\Allocator.hpp": {
+    "mtime": 1780443783.9881003,
+    "ast_hash": "7c50fbe93b3466d24ab7e2b89f9fa46a",
+    "semantic_hash": "7c50fbe93b3466d24ab7e2b89f9fa46a"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\MemoryPool.hpp": {
+    "mtime": 1780443783.9891,
+    "ast_hash": "3353c57d0406e22264ca528f44aa21b8",
+    "semantic_hash": "3353c57d0406e22264ca528f44aa21b8"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\MemoryPoolList.hpp": {
+    "mtime": 1780443783.9901,
+    "ast_hash": "e096d2dace308f4fd91f57236aae4ff1",
+    "semantic_hash": "e096d2dace308f4fd91f57236aae4ff1"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\ResourceManager.hpp": {
+    "mtime": 1780443783.9901,
+    "ast_hash": "d25fbbd5249841d2c5612964d3503e8c",
+    "semantic_hash": "d25fbbd5249841d2c5612964d3503e8c"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\ResourceManagerImpl.hpp": {
+    "mtime": 1780443783.991101,
+    "ast_hash": "7f82669e468f771f105e20e5c3b3896d",
+    "semantic_hash": "7f82669e468f771f105e20e5c3b3896d"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\StringBuffer.hpp": {
+    "mtime": 1780443783.991101,
+    "ast_hash": "8748513996f67f3f0a7e4cd7e14e341f",
+    "semantic_hash": "8748513996f67f3f0a7e4cd7e14e341f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\StringBuilder.hpp": {
+    "mtime": 1780443783.992101,
+    "ast_hash": "9d0d6e989f7e95c25811116d6fa2e075",
+    "semantic_hash": "9d0d6e989f7e95c25811116d6fa2e075"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\StringNode.hpp": {
+    "mtime": 1780443783.992101,
+    "ast_hash": "319fefe494d902116b7a0e15b43323ef",
+    "semantic_hash": "319fefe494d902116b7a0e15b43323ef"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Memory\\StringPool.hpp": {
+    "mtime": 1780443783.992101,
+    "ast_hash": "22d9359f40fecc3ec79d89f5b5b3b26a",
+    "semantic_hash": "22d9359f40fecc3ec79d89f5b5b3b26a"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Misc\\SerializedValue.hpp": {
+    "mtime": 1780443783.993101,
+    "ast_hash": "079853edcd6d07597b9f69d7629184a7",
+    "semantic_hash": "079853edcd6d07597b9f69d7629184a7"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\MsgPack\\MsgPackBinary.hpp": {
+    "mtime": 1780443783.9941013,
+    "ast_hash": "1c818b54a5965b9e18525394ba0514be",
+    "semantic_hash": "1c818b54a5965b9e18525394ba0514be"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\MsgPack\\MsgPackDeserializer.hpp": {
+    "mtime": 1780443783.995101,
+    "ast_hash": "6d6b3a0eb69e95ea5260b1eea354bcfc",
+    "semantic_hash": "6d6b3a0eb69e95ea5260b1eea354bcfc"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\MsgPack\\MsgPackExtension.hpp": {
+    "mtime": 1780443783.995101,
+    "ast_hash": "1253f540d300580bc92998e8ffea415a",
+    "semantic_hash": "1253f540d300580bc92998e8ffea415a"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\MsgPack\\MsgPackSerializer.hpp": {
+    "mtime": 1780443783.996101,
+    "ast_hash": "59f6f5e3fbaa68ce0cd1c0887288f131",
+    "semantic_hash": "59f6f5e3fbaa68ce0cd1c0887288f131"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\MsgPack\\endianness.hpp": {
+    "mtime": 1780443783.996101,
+    "ast_hash": "a3ef8226d02c764941ee8c78e84dea7b",
+    "semantic_hash": "a3ef8226d02c764941ee8c78e84dea7b"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\MsgPack\\ieee754.hpp": {
+    "mtime": 1780443783.9971013,
+    "ast_hash": "d452658cc618e3c8236cfc9cc564f86f",
+    "semantic_hash": "d452658cc618e3c8236cfc9cc564f86f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Namespace.hpp": {
+    "mtime": 1780443783.9971013,
+    "ast_hash": "8c911cf1b08fda193c1c8458beec65f9",
+    "semantic_hash": "8c911cf1b08fda193c1c8458beec65f9"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Numbers\\FloatParts.hpp": {
+    "mtime": 1780443783.998101,
+    "ast_hash": "be2d296dfd187344b18bde3798c77154",
+    "semantic_hash": "be2d296dfd187344b18bde3798c77154"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Numbers\\FloatTraits.hpp": {
+    "mtime": 1780443783.9991012,
+    "ast_hash": "7f1d9ec1859d54aff0fd7b856e64d612",
+    "semantic_hash": "7f1d9ec1859d54aff0fd7b856e64d612"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Numbers\\JsonFloat.hpp": {
+    "mtime": 1780443783.9991012,
+    "ast_hash": "0c6ac30e50e164ed1a5dddfd847aa11a",
+    "semantic_hash": "0c6ac30e50e164ed1a5dddfd847aa11a"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Numbers\\JsonInteger.hpp": {
+    "mtime": 1780443784.0001001,
+    "ast_hash": "b2a68f22aebdbed74c8e10920ec9e382",
+    "semantic_hash": "b2a68f22aebdbed74c8e10920ec9e382"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Numbers\\arithmeticCompare.hpp": {
+    "mtime": 1780443784.0001001,
+    "ast_hash": "4515b474a5d078708952b6f78b052c31",
+    "semantic_hash": "4515b474a5d078708952b6f78b052c31"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Numbers\\convertNumber.hpp": {
+    "mtime": 1780443784.0011,
+    "ast_hash": "9c478408f2dbe471a4d34ed81014078f",
+    "semantic_hash": "9c478408f2dbe471a4d34ed81014078f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Numbers\\parseNumber.hpp": {
+    "mtime": 1780443784.0011,
+    "ast_hash": "d5cef337ae354a6ef0808934c87dc31d",
+    "semantic_hash": "d5cef337ae354a6ef0808934c87dc31d"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Object\\JsonObject.hpp": {
+    "mtime": 1780443784.0021,
+    "ast_hash": "a01e465bf06e546e142a42f8f076e18f",
+    "semantic_hash": "a01e465bf06e546e142a42f8f076e18f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Object\\JsonObjectConst.hpp": {
+    "mtime": 1780443784.0030994,
+    "ast_hash": "59a2aa3c84cd8b80dde5172a84f7bdbe",
+    "semantic_hash": "59a2aa3c84cd8b80dde5172a84f7bdbe"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Object\\JsonObjectIterator.hpp": {
+    "mtime": 1780443784.0030994,
+    "ast_hash": "f390b6cd6b6a0e228a1da842ed1dc79f",
+    "semantic_hash": "f390b6cd6b6a0e228a1da842ed1dc79f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Object\\JsonPair.hpp": {
+    "mtime": 1780443784.0041,
+    "ast_hash": "e2f3bbc2c63e4585f0c3fb863d295cf9",
+    "semantic_hash": "e2f3bbc2c63e4585f0c3fb863d295cf9"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Object\\MemberProxy.hpp": {
+    "mtime": 1780443784.0041,
+    "ast_hash": "e3c6135d59badcdee49e191c7bfd7b57",
+    "semantic_hash": "e3c6135d59badcdee49e191c7bfd7b57"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Object\\ObjectData.hpp": {
+    "mtime": 1780443784.0051,
+    "ast_hash": "7d7c6f48ca05444261f02546387fd5b5",
+    "semantic_hash": "7d7c6f48ca05444261f02546387fd5b5"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Object\\ObjectImpl.hpp": {
+    "mtime": 1780443784.0051,
+    "ast_hash": "0409b7a5de9fa00f403d049d04b3ef23",
+    "semantic_hash": "0409b7a5de9fa00f403d049d04b3ef23"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\alias_cast.hpp": {
+    "mtime": 1780443784.0061004,
+    "ast_hash": "4afa5a534c0643757ba6aa06b791d64e",
+    "semantic_hash": "4afa5a534c0643757ba6aa06b791d64e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\assert.hpp": {
+    "mtime": 1780443784.0061004,
+    "ast_hash": "e852880e117a298a298c4cfdf815c9bb",
+    "semantic_hash": "e852880e117a298a298c4cfdf815c9bb"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\attributes.hpp": {
+    "mtime": 1780443784.0071003,
+    "ast_hash": "a93616e720f6db5514bdffdd066f25fe",
+    "semantic_hash": "a93616e720f6db5514bdffdd066f25fe"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\ctype.hpp": {
+    "mtime": 1780443784.0071003,
+    "ast_hash": "7fcd1ffb9ceb999fe60217fbd7bb9cee",
+    "semantic_hash": "7fcd1ffb9ceb999fe60217fbd7bb9cee"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\integer.hpp": {
+    "mtime": 1780443784.0081,
+    "ast_hash": "245368cabde789b28016c57ac12f65f1",
+    "semantic_hash": "245368cabde789b28016c57ac12f65f1"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\limits.hpp": {
+    "mtime": 1780443784.0081,
+    "ast_hash": "fa0e74ace4d85769c0711594b0f29519",
+    "semantic_hash": "fa0e74ace4d85769c0711594b0f29519"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\math.hpp": {
+    "mtime": 1780443784.0091002,
+    "ast_hash": "f2bf1b154817e01536fe6de300dfec79",
+    "semantic_hash": "f2bf1b154817e01536fe6de300dfec79"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\mpl\\max.hpp": {
+    "mtime": 1780443784.0101,
+    "ast_hash": "54e72059a6ec4cabb566c8405a0ecac0",
+    "semantic_hash": "54e72059a6ec4cabb566c8405a0ecac0"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\pgmspace.hpp": {
+    "mtime": 1780443784.0101,
+    "ast_hash": "eae131c452a8470702403d4d31dda093",
+    "semantic_hash": "eae131c452a8470702403d4d31dda093"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\pgmspace_generic.hpp": {
+    "mtime": 1780443784.0111,
+    "ast_hash": "7e77605a3b2fa107d44d3ef8b55f5059",
+    "semantic_hash": "7e77605a3b2fa107d44d3ef8b55f5059"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\preprocessor.hpp": {
+    "mtime": 1780443784.0111,
+    "ast_hash": "17111f29a55ed706a8ce019259567872",
+    "semantic_hash": "17111f29a55ed706a8ce019259567872"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits.hpp": {
+    "mtime": 1780443784.0121005,
+    "ast_hash": "c0de445a9d13a438636a425141e5f3fd",
+    "semantic_hash": "c0de445a9d13a438636a425141e5f3fd"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\conditional.hpp": {
+    "mtime": 1780443784.0121005,
+    "ast_hash": "266b0405a46599e970505a743143822a",
+    "semantic_hash": "266b0405a46599e970505a743143822a"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\decay.hpp": {
+    "mtime": 1780443784.0131001,
+    "ast_hash": "6d3c6f1b543058a3ee9d6da25898eb5e",
+    "semantic_hash": "6d3c6f1b543058a3ee9d6da25898eb5e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\declval.hpp": {
+    "mtime": 1780443784.0131001,
+    "ast_hash": "cd807d057bda5d999f4d65830eab6e35",
+    "semantic_hash": "cd807d057bda5d999f4d65830eab6e35"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\enable_if.hpp": {
+    "mtime": 1780443784.0141,
+    "ast_hash": "1998b4e55593cb6a0e17f2fdb5e2fda2",
+    "semantic_hash": "1998b4e55593cb6a0e17f2fdb5e2fda2"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\function_traits.hpp": {
+    "mtime": 1780443784.0151,
+    "ast_hash": "7598852772c3d6c41903cf09ecc7843f",
+    "semantic_hash": "7598852772c3d6c41903cf09ecc7843f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\integral_constant.hpp": {
+    "mtime": 1780443784.0151,
+    "ast_hash": "0df008eef8b555f4a09cbd4611b5c26d",
+    "semantic_hash": "0df008eef8b555f4a09cbd4611b5c26d"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_array.hpp": {
+    "mtime": 1780443784.0161,
+    "ast_hash": "33a41228c6098e4b4b8c93ae1f4ccc15",
+    "semantic_hash": "33a41228c6098e4b4b8c93ae1f4ccc15"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_base_of.hpp": {
+    "mtime": 1780443784.0161,
+    "ast_hash": "360d6801ae598b3f3325f510cebba423",
+    "semantic_hash": "360d6801ae598b3f3325f510cebba423"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_class.hpp": {
+    "mtime": 1780443784.017101,
+    "ast_hash": "4b1e87bd7c1d877963ff384ff4e89a0c",
+    "semantic_hash": "4b1e87bd7c1d877963ff384ff4e89a0c"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_const.hpp": {
+    "mtime": 1780443784.017101,
+    "ast_hash": "90afeaf411ee8da3c151d25c64968c03",
+    "semantic_hash": "90afeaf411ee8da3c151d25c64968c03"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_convertible.hpp": {
+    "mtime": 1780443784.0181005,
+    "ast_hash": "a4ee7110f612026868cee355eadc9de2",
+    "semantic_hash": "a4ee7110f612026868cee355eadc9de2"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_enum.hpp": {
+    "mtime": 1780443784.0181005,
+    "ast_hash": "875234274a2d9f1f192029522f0303af",
+    "semantic_hash": "875234274a2d9f1f192029522f0303af"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_floating_point.hpp": {
+    "mtime": 1780443784.0191002,
+    "ast_hash": "074afee11f700ceb692eb0e84ab8b5a3",
+    "semantic_hash": "074afee11f700ceb692eb0e84ab8b5a3"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_integral.hpp": {
+    "mtime": 1780443784.0191002,
+    "ast_hash": "9f12b9c8ef6c6a547502f0cff15bf913",
+    "semantic_hash": "9f12b9c8ef6c6a547502f0cff15bf913"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_pointer.hpp": {
+    "mtime": 1780443784.0201,
+    "ast_hash": "170d831c7bdd334ead6052e1379611d4",
+    "semantic_hash": "170d831c7bdd334ead6052e1379611d4"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_same.hpp": {
+    "mtime": 1780443784.0201,
+    "ast_hash": "b219cce2459259af3ca36d876c4c57ee",
+    "semantic_hash": "b219cce2459259af3ca36d876c4c57ee"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_signed.hpp": {
+    "mtime": 1780443784.0211,
+    "ast_hash": "0b5177809f4c58ccf2c6c78aeaff401e",
+    "semantic_hash": "0b5177809f4c58ccf2c6c78aeaff401e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\is_unsigned.hpp": {
+    "mtime": 1780443784.0211,
+    "ast_hash": "118a605ec0a56707fb43833b39d7021d",
+    "semantic_hash": "118a605ec0a56707fb43833b39d7021d"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\make_unsigned.hpp": {
+    "mtime": 1780443784.0221002,
+    "ast_hash": "c68760bba40a3ec4e77aa345d19957ec",
+    "semantic_hash": "c68760bba40a3ec4e77aa345d19957ec"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\remove_const.hpp": {
+    "mtime": 1780443784.0221002,
+    "ast_hash": "92cdc398c0fa8408289d34b4bfd5ce1a",
+    "semantic_hash": "92cdc398c0fa8408289d34b4bfd5ce1a"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\remove_cv.hpp": {
+    "mtime": 1780443784.0221002,
+    "ast_hash": "87f5956061b434a07fe03b05709106a1",
+    "semantic_hash": "87f5956061b434a07fe03b05709106a1"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\remove_reference.hpp": {
+    "mtime": 1780443784.0240998,
+    "ast_hash": "fcdcd52ad808fc8dd8a4d5dae40c24c0",
+    "semantic_hash": "fcdcd52ad808fc8dd8a4d5dae40c24c0"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\type_identity.hpp": {
+    "mtime": 1780443784.0240998,
+    "ast_hash": "c41a3d548a03d9fc5ade8aa61b7bfdaa",
+    "semantic_hash": "c41a3d548a03d9fc5ade8aa61b7bfdaa"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\type_traits\\void_t.hpp": {
+    "mtime": 1780443784.025101,
+    "ast_hash": "e7d9a6247c4abb574293f0174575d46f",
+    "semantic_hash": "e7d9a6247c4abb574293f0174575d46f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Polyfills\\utility.hpp": {
+    "mtime": 1780443784.025101,
+    "ast_hash": "843ac916216f55993e9a10a3f43b74bf",
+    "semantic_hash": "843ac916216f55993e9a10a3f43b74bf"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\CountingDecorator.hpp": {
+    "mtime": 1780443784.0261002,
+    "ast_hash": "9a1814bd9e36e54a0ee93b14c14ccf9f",
+    "semantic_hash": "9a1814bd9e36e54a0ee93b14c14ccf9f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\Writer.hpp": {
+    "mtime": 1780443784.0261002,
+    "ast_hash": "099cd58e29a11d89912704742a8a10a1",
+    "semantic_hash": "099cd58e29a11d89912704742a8a10a1"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\Writers\\ArduinoStringWriter.hpp": {
+    "mtime": 1780443784.0271,
+    "ast_hash": "d48346ea8c833a2b0fe907d9696bddef",
+    "semantic_hash": "d48346ea8c833a2b0fe907d9696bddef"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\Writers\\DummyWriter.hpp": {
+    "mtime": 1780443784.0281,
+    "ast_hash": "7090d130da9e577e01d162425a8959f7",
+    "semantic_hash": "7090d130da9e577e01d162425a8959f7"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\Writers\\PrintWriter.hpp": {
+    "mtime": 1780443784.0281,
+    "ast_hash": "6f78717fffc75bee0e3ab5320c3ddbd8",
+    "semantic_hash": "6f78717fffc75bee0e3ab5320c3ddbd8"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\Writers\\StaticStringWriter.hpp": {
+    "mtime": 1780443784.0291,
+    "ast_hash": "3e4ea620ca77c21f73317aab5380da65",
+    "semantic_hash": "3e4ea620ca77c21f73317aab5380da65"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\Writers\\StdStreamWriter.hpp": {
+    "mtime": 1780443784.0291,
+    "ast_hash": "bbfeb4633cc1e5b661860877e9e390f5",
+    "semantic_hash": "bbfeb4633cc1e5b661860877e9e390f5"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\Writers\\StdStringWriter.hpp": {
+    "mtime": 1780443784.0301,
+    "ast_hash": "82c642feb536bc8a88c4bafb4f40edaa",
+    "semantic_hash": "82c642feb536bc8a88c4bafb4f40edaa"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\measure.hpp": {
+    "mtime": 1780443784.0301,
+    "ast_hash": "35a1265695705b01ec4f3ff3cfa5d602",
+    "semantic_hash": "35a1265695705b01ec4f3ff3cfa5d602"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Serialization\\serialize.hpp": {
+    "mtime": 1780443784.0311007,
+    "ast_hash": "f6bd684b1db15a09efe1014209331d0f",
+    "semantic_hash": "f6bd684b1db15a09efe1014209331d0f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Strings\\Adapters\\FlashString.hpp": {
+    "mtime": 1780443784.0321002,
+    "ast_hash": "b4d8a7b19dd352cf63bcf447622e8754",
+    "semantic_hash": "b4d8a7b19dd352cf63bcf447622e8754"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Strings\\Adapters\\RamString.hpp": {
+    "mtime": 1780443784.0321002,
+    "ast_hash": "60ad020465f3c8d173584a043e5b17f6",
+    "semantic_hash": "60ad020465f3c8d173584a043e5b17f6"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Strings\\Adapters\\StringObject.hpp": {
+    "mtime": 1780443784.0331004,
+    "ast_hash": "18a86c5aa6e1f1803c6791ead1e2adec",
+    "semantic_hash": "18a86c5aa6e1f1803c6791ead1e2adec"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Strings\\IsString.hpp": {
+    "mtime": 1780443784.0331004,
+    "ast_hash": "106aa0b8ef51feb52871db2604275bc6",
+    "semantic_hash": "106aa0b8ef51feb52871db2604275bc6"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Strings\\JsonString.hpp": {
+    "mtime": 1780443784.0341003,
+    "ast_hash": "d9f378bcd35e6d24386b91ad6e4630b0",
+    "semantic_hash": "d9f378bcd35e6d24386b91ad6e4630b0"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Strings\\StringAdapter.hpp": {
+    "mtime": 1780443784.0341003,
+    "ast_hash": "16b3bd62e72b2e55d71ae2b41560b625",
+    "semantic_hash": "16b3bd62e72b2e55d71ae2b41560b625"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Strings\\StringAdapters.hpp": {
+    "mtime": 1780443784.0351,
+    "ast_hash": "a387fa1b6d89b4819089fae1d9058229",
+    "semantic_hash": "a387fa1b6d89b4819089fae1d9058229"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Strings\\StringTraits.hpp": {
+    "mtime": 1780443784.0351,
+    "ast_hash": "4e10310bebc537871885e029c92e9e97",
+    "semantic_hash": "4e10310bebc537871885e029c92e9e97"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\Converter.hpp": {
+    "mtime": 1780443784.0361001,
+    "ast_hash": "0a9c212ebafdf4c765c805b30355afbb",
+    "semantic_hash": "0a9c212ebafdf4c765c805b30355afbb"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\ConverterImpl.hpp": {
+    "mtime": 1780443784.0371,
+    "ast_hash": "96a1cbcd8779a0cd8c5452b10c8c6eb6",
+    "semantic_hash": "96a1cbcd8779a0cd8c5452b10c8c6eb6"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\JsonVariant.hpp": {
+    "mtime": 1780443784.0371,
+    "ast_hash": "508601ddd54bffc9b06f96c4e96513d9",
+    "semantic_hash": "508601ddd54bffc9b06f96c4e96513d9"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\JsonVariantConst.hpp": {
+    "mtime": 1780443784.0381045,
+    "ast_hash": "ee1d55250e76d3aafae348536c2aff08",
+    "semantic_hash": "ee1d55250e76d3aafae348536c2aff08"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\JsonVariantCopier.hpp": {
+    "mtime": 1780443784.0381045,
+    "ast_hash": "c58b4ab041e53aa6e23a16a2a0bc7697",
+    "semantic_hash": "c58b4ab041e53aa6e23a16a2a0bc7697"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\JsonVariantVisitor.hpp": {
+    "mtime": 1780443784.039104,
+    "ast_hash": "399176444ad98c49ce8256021ef387bb",
+    "semantic_hash": "399176444ad98c49ce8256021ef387bb"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantAttorney.hpp": {
+    "mtime": 1780443784.039104,
+    "ast_hash": "6054a27753d2cc3222de49fedebcf900",
+    "semantic_hash": "6054a27753d2cc3222de49fedebcf900"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantCompare.hpp": {
+    "mtime": 1780443784.0401044,
+    "ast_hash": "e9ef894b0e958fec758c8c7389a42175",
+    "semantic_hash": "e9ef894b0e958fec758c8c7389a42175"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantContent.hpp": {
+    "mtime": 1780443784.0401044,
+    "ast_hash": "2d82feca4630843368a333e000729235",
+    "semantic_hash": "2d82feca4630843368a333e000729235"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantData.hpp": {
+    "mtime": 1780443784.0411038,
+    "ast_hash": "806099468d96f9a83aa2ec6309021833",
+    "semantic_hash": "806099468d96f9a83aa2ec6309021833"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantDataVisitor.hpp": {
+    "mtime": 1780443784.0411038,
+    "ast_hash": "65085d952db08a36f603b92edb55ea0d",
+    "semantic_hash": "65085d952db08a36f603b92edb55ea0d"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantImpl.hpp": {
+    "mtime": 1780443784.0411038,
+    "ast_hash": "4cb0a4291ff3f3340ea39cf8ad4c8c06",
+    "semantic_hash": "4cb0a4291ff3f3340ea39cf8ad4c8c06"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantOperators.hpp": {
+    "mtime": 1780443784.042104,
+    "ast_hash": "fe4ac3e9fd3d61c3ee0d867bdb4997f7",
+    "semantic_hash": "fe4ac3e9fd3d61c3ee0d867bdb4997f7"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantRefBase.hpp": {
+    "mtime": 1780443784.042104,
+    "ast_hash": "8d1cb6409363e4c222a1f8d55b8a798c",
+    "semantic_hash": "8d1cb6409363e4c222a1f8d55b8a798c"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantRefBaseImpl.hpp": {
+    "mtime": 1780443784.043104,
+    "ast_hash": "40dabfded16bc5d4ab7dac32794ba03e",
+    "semantic_hash": "40dabfded16bc5d4ab7dac32794ba03e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantTag.hpp": {
+    "mtime": 1780443784.043104,
+    "ast_hash": "1438a530c8cfa8660b7950b304abc55c",
+    "semantic_hash": "1438a530c8cfa8660b7950b304abc55c"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\Variant\\VariantTo.hpp": {
+    "mtime": 1780443784.0441039,
+    "ast_hash": "6cd5699ade3e74afc99662847f51af77",
+    "semantic_hash": "6cd5699ade3e74afc99662847f51af77"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\compatibility.hpp": {
+    "mtime": 1780443784.0441039,
+    "ast_hash": "f2887016a015d8455da9cefc289d3ef8",
+    "semantic_hash": "f2887016a015d8455da9cefc289d3ef8"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ArduinoJson\\src\\ArduinoJson\\version.hpp": {
+    "mtime": 1780443784.0451045,
+    "ast_hash": "a1aa09836d09c022ed408f7759133fb1",
+    "semantic_hash": "a1aa09836d09c022ed408f7759133fb1"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\AsyncTCP-esphome\\examples\\ClientServer\\Client\\config.h": {
+    "mtime": 1780443784.0546124,
+    "ast_hash": "3d0b77cd492d5b62c71fca5a243538f2",
+    "semantic_hash": "3d0b77cd492d5b62c71fca5a243538f2"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\AsyncTCP-esphome\\library.json": {
+    "mtime": 1780443784.0556133,
+    "ast_hash": "7cb66a9493390862b2ba3100bcb0e30e",
+    "semantic_hash": "7cb66a9493390862b2ba3100bcb0e30e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\AsyncTCP-esphome\\src\\AsyncTCP.cpp": {
+    "mtime": 1780443784.0566134,
+    "ast_hash": "bc883ce3d365e7e5fd176b197506a2f1",
+    "semantic_hash": "bc883ce3d365e7e5fd176b197506a2f1"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\AsyncTCP-esphome\\src\\AsyncTCP.h": {
+    "mtime": 1780443784.057612,
+    "ast_hash": "5a109c6d68a2b967ece0cf0c1038e135",
+    "semantic_hash": "5a109c6d68a2b967ece0cf0c1038e135"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESP32Encoder\\AddDoxygenToGHPages.sh": {
+    "mtime": 1780443784.0596123,
+    "ast_hash": "ad6b46325dff31993438d480b0a69bc3",
+    "semantic_hash": "ad6b46325dff31993438d480b0a69bc3"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESP32Encoder\\src\\ESP32Encoder.cpp": {
+    "mtime": 1780443784.0646122,
+    "ast_hash": "41239e95c279fe081c9723fcd7a8b90e",
+    "semantic_hash": "41239e95c279fe081c9723fcd7a8b90e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESP32Encoder\\src\\ESP32Encoder.h": {
+    "mtime": 1780443784.0656137,
+    "ast_hash": "31fbf4d5020e3123b1fc86b93d9c3950",
+    "semantic_hash": "31fbf4d5020e3123b1fc86b93d9c3950"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESP32Encoder\\src\\InterruptEncoder.cpp": {
+    "mtime": 1780443784.0656137,
+    "ast_hash": "b669f786858446e0d9e3ce8fc84576b8",
+    "semantic_hash": "b669f786858446e0d9e3ce8fc84576b8"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESP32Encoder\\src\\InterruptEncoder.h": {
+    "mtime": 1780443784.0666122,
+    "ast_hash": "3323778eff3861df20e5c872d8fc73bf",
+    "semantic_hash": "3323778eff3861df20e5c872d8fc73bf"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\.github\\scripts\\install-arduino-core-esp32.sh": {
+    "mtime": 1780443784.068612,
+    "ast_hash": "3af1c0a2cf4492d73b77e6ed52485872",
+    "semantic_hash": "3af1c0a2cf4492d73b77e6ed52485872"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\.github\\scripts\\install-arduino-core-esp8266.sh": {
+    "mtime": 1780443784.068612,
+    "ast_hash": "9dc0512b8fddeef94a649881223abf18",
+    "semantic_hash": "9dc0512b8fddeef94a649881223abf18"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\.github\\scripts\\install-arduino-ide.sh": {
+    "mtime": 1780443784.0696118,
+    "ast_hash": "7e8aeade4ced580190a7b44eec868dd6",
+    "semantic_hash": "7e8aeade4ced580190a7b44eec868dd6"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\.github\\scripts\\install-platformio.sh": {
+    "mtime": 1780443784.0696118,
+    "ast_hash": "f32d1a05fc114647dc775cd1488de66f",
+    "semantic_hash": "f32d1a05fc114647dc775cd1488de66f"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\.github\\scripts\\on-push.sh": {
+    "mtime": 1780443784.070612,
+    "ast_hash": "03d47194d2d1230523efdf1892221cbf",
+    "semantic_hash": "03d47194d2d1230523efdf1892221cbf"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\library.json": {
+    "mtime": 1780443784.0806134,
+    "ast_hash": "682d6f761b3d4d953ac08e37ab298a57",
+    "semantic_hash": "682d6f761b3d4d953ac08e37ab298a57"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\AsyncEventSource.cpp": {
+    "mtime": 1780443784.0816123,
+    "ast_hash": "a7062b9f49d4ee1d7890d0ef71fbae48",
+    "semantic_hash": "a7062b9f49d4ee1d7890d0ef71fbae48"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\AsyncEventSource.h": {
+    "mtime": 1780443784.0816123,
+    "ast_hash": "213b41a35524e5fa731eb24b7864131c",
+    "semantic_hash": "213b41a35524e5fa731eb24b7864131c"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\AsyncJson.h": {
+    "mtime": 1780443784.0826123,
+    "ast_hash": "8ac8122699349ef455f78c945f7710e2",
+    "semantic_hash": "8ac8122699349ef455f78c945f7710e2"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\AsyncWebSocket.cpp": {
+    "mtime": 1780443784.0826123,
+    "ast_hash": "186ad11aa4879ccdcbf215fc03f51b63",
+    "semantic_hash": "186ad11aa4879ccdcbf215fc03f51b63"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\AsyncWebSocket.h": {
+    "mtime": 1780443784.083612,
+    "ast_hash": "77a5338f72fcd6b0a11f812474a616e3",
+    "semantic_hash": "77a5338f72fcd6b0a11f812474a616e3"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\AsyncWebSynchronization.h": {
+    "mtime": 1780443784.083612,
+    "ast_hash": "1d9ae58e61e3b630a37f7762ce27ff5c",
+    "semantic_hash": "1d9ae58e61e3b630a37f7762ce27ff5c"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\ESPAsyncWebServer.h": {
+    "mtime": 1780443784.084612,
+    "ast_hash": "e95bc001686efd6df116433582d38737",
+    "semantic_hash": "e95bc001686efd6df116433582d38737"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\StringArray.h": {
+    "mtime": 1780443784.0856118,
+    "ast_hash": "4769e679cccf6e09133f9e491b5c541e",
+    "semantic_hash": "4769e679cccf6e09133f9e491b5c541e"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\WebAuthentication.cpp": {
+    "mtime": 1780443784.0856118,
+    "ast_hash": "25f8f9661b276caa6249754352c9fcf4",
+    "semantic_hash": "25f8f9661b276caa6249754352c9fcf4"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\WebAuthentication.h": {
+    "mtime": 1780443784.0866115,
+    "ast_hash": "06b0261780424ad6913b0aec0794d984",
+    "semantic_hash": "06b0261780424ad6913b0aec0794d984"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\WebHandlerImpl.h": {
+    "mtime": 1780443784.0866115,
+    "ast_hash": "81417c035b668729f0a324715460e261",
+    "semantic_hash": "81417c035b668729f0a324715460e261"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\WebHandlers.cpp": {
+    "mtime": 1780443784.0876122,
+    "ast_hash": "4d38305939cd25db610811f67f394e88",
+    "semantic_hash": "4d38305939cd25db610811f67f394e88"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\WebRequest.cpp": {
+    "mtime": 1780443784.0876122,
+    "ast_hash": "bc70c7ab0efd53fcb6796a57f2428b8b",
+    "semantic_hash": "bc70c7ab0efd53fcb6796a57f2428b8b"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\WebResponseImpl.h": {
+    "mtime": 1780443784.088612,
+    "ast_hash": "db674a786173f8669c157d4d44dfbae5",
+    "semantic_hash": "db674a786173f8669c157d4d44dfbae5"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\WebResponses.cpp": {
+    "mtime": 1780443784.088612,
+    "ast_hash": "66499cb5bf717cf0c8866e9316a923d4",
+    "semantic_hash": "66499cb5bf717cf0c8866e9316a923d4"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\ESPAsyncWebServer-esphome\\src\\WebServer.cpp": {
+    "mtime": 1780443784.089612,
+    "ast_hash": "689d7f2fee40f3a6a1dd5ecb2ad968ef",
+    "semantic_hash": "689d7f2fee40f3a6a1dd5ecb2ad968ef"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\LiquidCrystal_I2C\\LiquidCrystal_I2C.cpp": {
+    "mtime": 1780443784.090612,
+    "ast_hash": "7234d578c301b42c4f054dac20ed4ae7",
+    "semantic_hash": "7234d578c301b42c4f054dac20ed4ae7"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\LiquidCrystal_I2C\\LiquidCrystal_I2C.h": {
+    "mtime": 1780443784.091612,
+    "ast_hash": "5403dd65e567b5c3f3b95a3dd3e20ce6",
+    "semantic_hash": "5403dd65e567b5c3f3b95a3dd3e20ce6"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\LiquidCrystal_I2C\\library.json": {
+    "mtime": 1780443784.0956123,
+    "ast_hash": "799cfe75aef52d1554025be16075561a",
+    "semantic_hash": "799cfe75aef52d1554025be16075561a"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\QuickPID\\library.json": {
+    "mtime": 1780443784.1036127,
+    "ast_hash": "07eec3b2a7698344ba96af99f2f018ec",
+    "semantic_hash": "07eec3b2a7698344ba96af99f2f018ec"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\QuickPID\\src\\QuickPID.cpp": {
+    "mtime": 1780443784.105612,
+    "ast_hash": "2101771d2273d6693f276bc2052a9af7",
+    "semantic_hash": "2101771d2273d6693f276bc2052a9af7"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.pio\\libdeps\\esp32dev\\QuickPID\\src\\QuickPID.h": {
+    "mtime": 1780443784.105612,
+    "ast_hash": "f70d8bc993344ce8a0abf5794afc7a85",
+    "semantic_hash": "f70d8bc993344ce8a0abf5794afc7a85"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.vscode\\c_cpp_properties.json": {
+    "mtime": 1780443809.175796,
+    "ast_hash": "c9e949c9c3ab5bd9b43cdc10c4eb8c90",
+    "semantic_hash": "c9e949c9c3ab5bd9b43cdc10c4eb8c90"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.vscode\\extensions.json": {
+    "mtime": 1780443809.178803,
+    "ast_hash": "41e5d8dec3ff179fe5aecb46632391ca",
+    "semantic_hash": "41e5d8dec3ff179fe5aecb46632391ca"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\.vscode\\launch.json": {
+    "mtime": 1780443809.195315,
+    "ast_hash": "f0987f0b636dd84fada6e9a62707afb7",
+    "semantic_hash": "f0987f0b636dd84fada6e9a62707afb7"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\data\\js\\chart.umd.min.js": {
+    "mtime": 1780443784.111612,
+    "ast_hash": "3cf395c5f5e4c79e91a28f3ce30aba73",
+    "semantic_hash": "3cf395c5f5e4c79e91a28f3ce30aba73"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\include\\ArduinoJson-v6.21.6.h": {
+    "mtime": 1780443784.1156127,
+    "ast_hash": "e45c4639a43cfe10a9db50ad7ece85a6",
+    "semantic_hash": "e45c4639a43cfe10a9db50ad7ece85a6"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\include\\motor_config.h": {
+    "mtime": 1780443784.1176136,
+    "ast_hash": "6aec1ed5e6b2a357446f762c009f5923",
+    "semantic_hash": "6aec1ed5e6b2a357446f762c009f5923"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\include\\wifi_config.h": {
+    "mtime": 1780443784.1176136,
+    "ast_hash": "65cf65303c4ff97b887f801f99c51b26",
+    "semantic_hash": "65cf65303c4ff97b887f801f99c51b26"
+  },
+  "C:\\Users\\Rafa\\esp32-motor-control\\src\\main.cpp": {
+    "mtime": 1780443784.1206129,
+    "ast_hash": "f0d4ddcef8ffde46b9222b1441c6e5f9",
+    "semantic_hash": "f0d4ddcef8ffde46b9222b1441c6e5f9"
+  }
+}

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "monitor_html", "label": "Monitoring Interface", "file_type": "code", "source_file": "data/monitor.html"}], "edges": [{"source": "monitor_html", "target": "main_cpp", "relation": "references", "confidence": "INFERRED", "confidence_score": 0.8, "source_file": "data/monitor.html"}], "hyperedges": []}
