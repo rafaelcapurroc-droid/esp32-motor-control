@@ -84,7 +84,7 @@ float pidOutput            = 0.0f;
 bool  setpointPending      = false;  // Hay un setpoint pendiente de confirmar
 
 QuickPID myPID(&currentLinearSpeedMs, &pidOutput, &setpointSpeed,
-               30.0f, 10.0f, 4.0f, QuickPID::Action::direct);
+               150.0f, 60.0f, 40.0f, QuickPID::Action::direct);
 
 // ============================================================
 // 6. BUFFER CIRCULAR HALL

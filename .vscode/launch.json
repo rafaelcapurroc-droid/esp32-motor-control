@@ -14,9 +14,8 @@
             "name": "PIO Debug",
             "executable": "C:/Users/Rafa/esp32-motor-control/.pio/build/esp32dev/firmware.elf",
             "projectEnvName": "esp32dev",
-            "toolchainBinDir": "",
+            "toolchainBinDir": "C:/Users/Rafa/.platformio/packages/toolchain-xtensa-esp32/bin",
             "internalConsoleOptions": "openOnSessionStart",
-            "svdPath": "C:/Users/Rafa/.platformio/platforms/espressif32@src-88f34194123b4b05ff6ef6b8e68c7f60/misc/svd/esp32.svd",
             "preLaunchTask": {
                 "type": "PlatformIO",
                 "task": "Pre-Debug"
@@ -28,9 +27,8 @@
             "name": "PIO Debug (skip Pre-Debug)",
             "executable": "C:/Users/Rafa/esp32-motor-control/.pio/build/esp32dev/firmware.elf",
             "projectEnvName": "esp32dev",
-            "toolchainBinDir": "",
-            "internalConsoleOptions": "openOnSessionStart",
-            "svdPath": "C:/Users/Rafa/.platformio/platforms/espressif32@src-88f34194123b4b05ff6ef6b8e68c7f60/misc/svd/esp32.svd"
+            "toolchainBinDir": "C:/Users/Rafa/.platformio/packages/toolchain-xtensa-esp32/bin",
+            "internalConsoleOptions": "openOnSessionStart"
         },
         {
             "type": "platformio-debug",
@@ -38,9 +36,8 @@
             "name": "PIO Debug (without uploading)",
             "executable": "C:/Users/Rafa/esp32-motor-control/.pio/build/esp32dev/firmware.elf",
             "projectEnvName": "esp32dev",
-            "toolchainBinDir": "",
+            "toolchainBinDir": "C:/Users/Rafa/.platformio/packages/toolchain-xtensa-esp32/bin",
             "internalConsoleOptions": "openOnSessionStart",
-            "svdPath": "C:/Users/Rafa/.platformio/platforms/espressif32@src-88f34194123b4b05ff6ef6b8e68c7f60/misc/svd/esp32.svd",
             "loadMode": "manual"
         }
     ]

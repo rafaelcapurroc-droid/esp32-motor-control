@@ -33,7 +33,7 @@
 
 // --- CONFIGURACIÓN MECÁNICA ---
 #define MAGNETS_COUNT        6
-#define DRIVE_ROLLER_DIAMETER_MM 36.0f  // Rodillo motriz de la cinta
+#define DRIVE_ROLLER_DIAMETER_MM 38.5f  // Rodillo motriz de la cinta
 #define PULLEY_DIAMETER_MM   60.0f      // Polea sensora (eje motriz)
 
 // --- CONFIGURACIÓN DE TRANSMISIÓN ---
