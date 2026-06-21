@@ -1,13 +1,19 @@
 // ============================================================
-//  TROTADORA PARA RATAS — Control PID v9.7
+//  TROTADORA PARA RATAS — Control PID v9.8
 //  Plataforma: ESP32 + Driver VNH5019 + Sensor Hall + KY-040
 //
-//  Cambios v9.6 → v9.7:
-//    - PID arranca en modo MANUAL, solo se activa con setpoint > 0
-//    - Límites PID: PID_OUTPUT_MIN (150) a MAX_VELOCITY al activar
-//    - Feed-forward al confirmar setpoint para respuesta rápida
-//    - motorStop() restaura límites neutros y pone PID en manual
-//    - Eliminado arranqueEnProceso (ya no es necesario)
+//  Cambios v9.7 → v9.8:
+//    - NUEVO: log crudo "imán por imán" (pulseLogBuffer), separado
+//      del filtro de mediana/EMA que usa el PID.
+//    - Cada pulso del Hall genera una muestra {periodo_us, rpm, vel}
+//      calculada SIN filtrar, que se acumula hasta el próximo
+//      broadcastState() y se envía como array "pulses" en el JSON
+//      del WebSocket.
+//    - El cliente web (monitoreo.html) arma con esto un CSV aparte
+//      ("CSV imán por imán") para graficar velocidad instantánea
+//      por imán fuera del ESP32 (Excel/Python).
+//    - No se modifica el camino de control del PID (sigue usando
+//      el filtro de mediana + EMA existente).
 // ============================================================
 
 #include <Arduino.h>
@@ -84,7 +90,7 @@ float pidOutput            = 0.0f;
 bool  setpointPending      = false;  // Hay un setpoint pendiente de confirmar
 
 QuickPID myPID(&currentLinearSpeedMs, &pidOutput, &setpointSpeed,
-               150.0f, 60.0f, 40.0f, QuickPID::Action::direct);
+               30.0f, 10.0f, 4.0f, QuickPID::Action::direct);
 
 // ============================================================
 // 6. BUFFER CIRCULAR HALL
@@ -94,6 +100,27 @@ static volatile uint8_t  hallBufferHead  = 0;
 static volatile uint8_t  hallBufferCount = 0;
 static volatile uint32_t lastHallMicros  = 0;
 static uint8_t           lastProcessedHead = 0;
+
+// ============================================================
+// 6b. LOG CRUDO IMÁN POR IMÁN (para CSV, no usado por el PID)
+// ============================================================
+// Tamaño holgado: a las velocidades de esta trotadora se esperan
+// pocos imanes por intervalo de broadcast (200 ms). Si tu motor
+// gira mucho más rápido o tenés muchos imanes, subí este valor.
+#define PULSE_LOG_SIZE 32
+
+struct PulseSample {
+  uint32_t periodo_us;  // período crudo entre este imán y el anterior
+  float    rpm;         // RPM instantánea calculada de ese período
+  float    vel_m_s;     // velocidad lineal instantánea de ese período
+};
+
+// Estos buffers solo se tocan desde loop() (calculateSpeed produce,
+// broadcastState consume y vacía) — no hay acceso desde la ISR,
+// así que no requieren protección contra interrupciones.
+static PulseSample pulseLogBuffer[PULSE_LOG_SIZE];
+static uint8_t     pulseLogCount    = 0;
+static bool        pulseLogOverflow = false;
 
 // ============================================================
 // 7. ENCODER KY-040
@@ -319,6 +346,20 @@ static float getMedian(uint32_t* arr, uint8_t size, uint8_t count) {
   return (float)temp[n / 2];
 }
 
+// Empuja una muestra cruda (sin filtrar) al log imán por imán.
+// Si el buffer está lleno (no se vació a tiempo por broadcastState),
+// se descarta la muestra y se marca overflow.
+static void logPulsoCrudo(uint32_t periodo_us, float rpm, float vel_m_s) {
+  if (pulseLogCount >= PULSE_LOG_SIZE) {
+    pulseLogOverflow = true;
+    return;
+  }
+  pulseLogBuffer[pulseLogCount].periodo_us = periodo_us;
+  pulseLogBuffer[pulseLogCount].rpm        = rpm;
+  pulseLogBuffer[pulseLogCount].vel_m_s    = vel_m_s;
+  pulseLogCount++;
+}
+
 static void calculateSpeed() {
   uint32_t periods[HALL_BUFFER_SIZE];
   uint8_t  currentHead;
@@ -364,6 +405,11 @@ static void calculateSpeed() {
       filterBuffer[filterIndex] = p;
       filterIndex = (filterIndex + 1) % FILTER_SIZE;
       if (filterCount < FILTER_SIZE) filterCount++;
+
+      // --- Log crudo imán por imán (independiente del filtro del PID) ---
+      float rawRpmSample = HALL_CONST_RPM   / (float)p;
+      float rawVelSample = HALL_CONST_SPEED / (float)p;
+      logPulsoCrudo(p, rawRpmSample, rawVelSample);
     }
   }
 
@@ -478,7 +524,12 @@ static void leerSerial() {
 // 19. WEBSOCKET
 // ============================================================
 void broadcastState() {
-  if (ws.count() == 0) return;
+  if (ws.count() == 0) {
+    // Sin clientes conectados: no acumulamos el log crudo indefinidamente.
+    pulseLogCount    = 0;
+    pulseLogOverflow = false;
+    return;
+  }
 
   JsonDocument doc;
   doc["velocity"]       = (int)round(pidOutput);
@@ -491,6 +542,22 @@ void broadcastState() {
   doc["sp_pending"]     = setpointPending;
   doc["encoder"]        = displayEncoderCount;
   doc["encoder_raw"]    = encoder.getCount();
+
+  // --- Log crudo imán por imán acumulado desde el último broadcast ---
+  if (pulseLogCount > 0) {
+    JsonArray pulses = doc["pulses"].to<JsonArray>();
+    for (uint8_t i = 0; i < pulseLogCount; i++) {
+      JsonObject p = pulses.add<JsonObject>();
+      p["p"] = pulseLogBuffer[i].periodo_us;  // período crudo en µs
+      p["v"] = pulseLogBuffer[i].vel_m_s;     // velocidad instantánea m/s
+      p["r"] = pulseLogBuffer[i].rpm;         // rpm instantánea
+    }
+    pulseLogCount = 0;
+  }
+  if (pulseLogOverflow) {
+    doc["pulses_overflow"] = true;
+    pulseLogOverflow = false;
+  }
 
   String json;
   serializeJson(doc, json);
@@ -582,7 +649,7 @@ static const char FALLBACK_PAGE[] PROGMEM = R"HTML(
 <!DOCTYPE html><html lang="es"><head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="UTF-8">
-<title>Trotadora PID v9.7</title>
+<title>Trotadora PID v9.8</title>
 <style>
 body{font-family:monospace;background:#0d0f14;color:#c8d0e0;padding:30px;max-width:620px;margin:0 auto}
 h2{color:#00e5ff}
@@ -592,7 +659,7 @@ button{padding:10px;background:#1e2330;border-radius:4px;cursor:pointer;margin:5
 .pending{color:#ffaa00}
 .confirmed{color:#39ff6e}
 </style></head><body>
-<h2>Trotadora PID v9.7</h2>
+<h2>Trotadora PID v9.8</h2>
 <div id="status">Conectando WebSocket...</div>
 <div id="metrics"></div>
 <div class="row">
@@ -719,7 +786,7 @@ void debugSerial() {
 // ============================================================
 void setup() {
   Serial.begin(115200);
-  Serial.println("\n[BOOT] Trotadora PID v9.7");
+  Serial.println("\n[BOOT] Trotadora PID v9.8");
 
   // Motor
   pinMode(MOTOR_IN1_PIN, OUTPUT);
@@ -775,7 +842,7 @@ void setup() {
   // LCD
   initLCD();
   if (lcd) {
-    lcd->setCursor(0, 0); lcd->print("TROTADORA v9.7");
+    lcd->setCursor(0, 0); lcd->print("TROTADORA v9.8");
     lcd->setCursor(0, 1); lcd->print("PID listo");
     delay(1500);
     lcd->clear();
@@ -799,6 +866,8 @@ void setup() {
                 PID_OUTPUT_MIN, PID_OUTPUT_MAX);
   Serial.println("[INFO] Comandos: SET SP <m/s> | GET VEL | GET ENC | RESET ENC | GET CUR | STOP | TUNE <Kp Ki Kd>");
   Serial.println("[INFO] Encoder: Gira para ajustar setpoint temporal, presiona para CONFIRMAR");
+  Serial.printf("[INFO] Log crudo imán por imán: hasta %d muestras por broadcast (%lu ms)\n",
+                PULSE_LOG_SIZE, WS_SEND_INTERVAL);
 }
 
 // ============================================================

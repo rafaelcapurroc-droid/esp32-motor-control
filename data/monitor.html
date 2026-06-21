@@ -23,12 +23,14 @@ h2{margin:0;font-size:1.1rem;color:#444}
 .unit{font-size:.85rem;color:#999;font-weight:400}
 .text-cyan{color:#17a2b8}
 .text-amber{color:#fd7e14}
+.text-purple{color:#6f42c1}
 .history-panel{background:#fff;padding:18px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);flex:1;overflow:hidden;display:flex;flex-direction:column}
-.history-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.history-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
 .history-header h3{font-size:1rem;color:#444}
 .btn-action{padding:6px 12px;font-size:.85rem;border:none;border-radius:4px;cursor:pointer;font-weight:600;margin-left:8px}
 .btn-clear{background:#e2e6ea;color:#444}
 .btn-csv{background:#28a745;color:#fff}
+.btn-csv-raw{background:#6f42c1;color:#fff}
 .table-container{flex:1;overflow-y:auto;border:1px solid #eee;border-radius:6px}
 table{width:100%;border-collapse:collapse;font-size:.9rem}
 th{background:#f8f9fa;color:#666;font-weight:600;text-transform:uppercase;font-size:.75rem;letter-spacing:1px;padding:12px;text-align:left;position:sticky;top:0;z-index:1}
@@ -36,6 +38,8 @@ td{padding:10px 12px;border-bottom:1px solid #eee;color:#333}
 tr:last-child td{border-bottom:none}
 tr:hover{background-color:#f8f9fa}
 .empty-msg{text-align:center;padding:20px;color:#999;font-style:italic}
+.raw-info{font-size:.78rem;color:#888;margin-right:auto}
+.overflow-warning{font-size:.78rem;color:#dc3545;font-weight:600;display:none}
 </style>
 </head>
 <body>
@@ -65,6 +69,10 @@ tr:hover{background-color:#f8f9fa}
       <div class="metric-label">PWM</div>
       <div class="metric-value"><span id="mPwm">0</span> <span class="unit">/1023</span></div>
     </div>
+    <div class="metric-card">
+      <div class="metric-label">Muestras crudas</div>
+      <div class="metric-value text-purple"><span id="mPulseCount">0</span></div>
+    </div>
   </div>
 
   <div class="history-panel">
@@ -91,6 +99,16 @@ tr:hover{background-color:#f8f9fa}
         </tbody>
       </table>
     </div>
+
+    <div class="history-header" style="margin-top:16px">
+      <h3>Log crudo imán por imán</h3>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="overflow-warning" id="overflowWarning">⚠ se perdieron muestras (buffer del ESP32 lleno)</span>
+        <span class="raw-info" id="rawInfo"></span>
+        <button class="btn-action btn-clear" onclick="clearPulseLog()">Limpiar</button>
+        <button class="btn-action btn-csv-raw" onclick="downloadPulseCSV()">CSV imán por imán</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -99,6 +117,10 @@ let ws = null;
 let wsRetryTimer = null;
 let historyData = [];
 const MAX_HISTORY = 100;
+
+// --- Log crudo imán por imán (sin límite de tamaño: se exporta y se limpia manualmente) ---
+let pulseLog = [];
+let cumulativeTimeUs = 0; // tiempo acumulado reconstruido a partir de los períodos recibidos
 
 function wsConnect() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
@@ -118,6 +140,12 @@ function wsConnect() {
       const d = JSON.parse(e.data);
       updateMetrics(d);
       addToHistory(d);
+      if (Array.isArray(d.pulses) && d.pulses.length > 0) {
+        addPulses(d.pulses);
+      }
+      if (d.pulses_overflow) {
+        document.getElementById('overflowWarning').style.display = 'inline';
+      }
     } catch (err) { console.error('JSON parse error', err); }
   };
   
@@ -223,6 +251,53 @@ function downloadCSV() {
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
   link.setAttribute("download", "motor_data.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// --- LOG CRUDO IMÁN POR IMÁN ---
+// Cada elemento de pulseLog: { periodo_us, rpm, vel_m_s, tiempo_acumulado_ms }
+// tiempo_acumulado_ms se reconstruye sumando los períodos recibidos (no hay
+// timestamp absoluto del ESP32 — alcanza para graficar velocidad vs. tiempo
+// relativo desde que se abrió esta página / se limpió el log).
+function addPulses(pulsesArr) {
+  pulsesArr.forEach(p => {
+    cumulativeTimeUs += p.p; // p.p = período crudo en µs
+    pulseLog.push({
+      periodo_us:          p.p,
+      rpm:                 p.r,
+      vel_m_s:             p.v,
+      tiempo_acumulado_ms: cumulativeTimeUs / 1000.0
+    });
+  });
+  document.getElementById('mPulseCount').textContent = pulseLog.length;
+  document.getElementById('rawInfo').textContent =
+    pulseLog.length + ' muestra(s) acumulada(s) desde la última limpieza';
+}
+
+function clearPulseLog() {
+  pulseLog = [];
+  cumulativeTimeUs = 0;
+  document.getElementById('mPulseCount').textContent = '0';
+  document.getElementById('rawInfo').textContent = '';
+  document.getElementById('overflowWarning').style.display = 'none';
+}
+
+function downloadPulseCSV() {
+  if (pulseLog.length === 0) return;
+
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "Periodo_us,RPM_instantanea,Velocidad_instantanea_m_s,Tiempo_acumulado_ms\n";
+
+  pulseLog.forEach(row => {
+    csvContent += `${row.periodo_us},${row.rpm.toFixed(2)},${row.vel_m_s.toFixed(4)},${row.tiempo_acumulado_ms.toFixed(3)}\n`;
+  });
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "pulsos_iman_por_iman.csv");
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
