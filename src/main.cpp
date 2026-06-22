@@ -90,7 +90,7 @@ float pidOutput            = 0.0f;
 bool  setpointPending      = false;  // Hay un setpoint pendiente de confirmar
 
 QuickPID myPID(&currentLinearSpeedMs, &pidOutput, &setpointSpeed,
-               30.0f, 10.0f, 4.0f, QuickPID::Action::direct);
+               150.0f, 60.0f, 40.0f, QuickPID::Action::direct);
 
 // ============================================================
 // 6. BUFFER CIRCULAR HALL
@@ -761,11 +761,11 @@ void updateLCD() {
   } else {
     snprintf(row0, sizeof(row0), "SP:%-4.2f V:%-4.2f", setpointSpeed, currentLinearSpeedMs);
   }
-  lcd->setCursor(0, 0);
+    lcd->setCursor(1, 0);
   lcd->print(row0);
 
   snprintf(row1, sizeof(row1), "PWM:%-4d I:%-4.2fA", (int)round(pidOutput), cachedCurrent);
-  lcd->setCursor(0, 1);
+    lcd->setCursor(1, 1);
   lcd->print(row1);
 }
 
@@ -842,8 +842,8 @@ void setup() {
   // LCD
   initLCD();
   if (lcd) {
-    lcd->setCursor(0, 0); lcd->print("TROTADORA v9.8");
-    lcd->setCursor(0, 1); lcd->print("PID listo");
+    lcd->setCursor(1, 0); lcd->print("TROTADORA v9.8");
+    lcd->setCursor(1, 1); lcd->print("LABSENS");
     delay(1500);
     lcd->clear();
   }
