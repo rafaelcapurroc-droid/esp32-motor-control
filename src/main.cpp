@@ -90,7 +90,7 @@ float pidOutput            = 0.0f;
 bool  setpointPending      = false;  // Hay un setpoint pendiente de confirmar
 
 QuickPID myPID(&currentLinearSpeedMs, &pidOutput, &setpointSpeed,
-               150.0f, 60.0f, 40.0f, QuickPID::Action::direct);
+               50.0f, 8.0f, 0.0f, QuickPID::Action::direct);
 
 // ============================================================
 // 6. BUFFER CIRCULAR HALL
@@ -211,6 +211,7 @@ void motorStop() {
   // Límites neutros y PID en manual para que no actúe sin setpoint
   myPID.SetOutputLimits(0, PID_OUTPUT_MAX);
   myPID.SetMode(QuickPID::Control::manual);
+  myPID.Reset();  // <-- NUEVO: Limpia outputSum, lastInput, términos PID
 }
 
 // ---------------------
@@ -219,10 +220,15 @@ void motorStop() {
 static void activarPID(float sp) {
   // Reset integrador: manual → automático
   myPID.SetMode(QuickPID::Control::manual);
+  myPID.Reset();  // <-- NUEVO: Asegurar limpieza antes de activar
 
   // Feed-forward proporcional al setpoint (precarga pidOutput)
-  pidOutput = PID_OUTPUT_MIN
-              + (sp / 2.0f) * (float)(PID_OUTPUT_MAX - PID_OUTPUT_MIN);
+  // DESPUÉS — basado en curva real medida
+  // PWM_REF1=400 → VEL_REF1=0.712, PWM_REF2=500 → VEL_REF2=0.935
+  const float VEL_REF1 = 0.712f, PWM_REF1 = 400.0f;
+  const float VEL_REF2 = 0.935f, PWM_REF2 = 500.0f;
+  float slope = (PWM_REF2 - PWM_REF1) / (VEL_REF2 - VEL_REF1);
+  pidOutput = PWM_REF1 + (sp - VEL_REF1) * slope;
   pidOutput = constrain(pidOutput, (float)PID_OUTPUT_MIN, (float)PID_OUTPUT_MAX);
 
   // Límites reales: nunca baja de PID_OUTPUT_MIN mientras hay setpoint
@@ -235,7 +241,8 @@ static void activarPID(float sp) {
   Serial.printf("[PID] Modo: %s | SP: %.3f | Current: %.3f | Error: %.3f\n", 
     (myPID.GetMode() == (uint8_t)QuickPID::Control::automatic) ? "AUTO" : "MANUAL",
     setpointSpeed, currentLinearSpeedMs, setpointSpeed - currentLinearSpeedMs);
-  Serial.printf("[PID] Kp=%.2f Ki=%.2f Kd=%.2f\n", myPID.GetKp(), myPID.GetKi(), myPID.GetKd());
+  Serial.printf("[PID] Kp=%.2f Ki=%.2f Kd=%.2f ", 
+    myPID.GetKp(), myPID.GetKi(), myPID.GetKd());
   // ============================================
 
   applyPWM((int)pidOutput);
@@ -452,6 +459,7 @@ void procesarComandoSerial(const char* cmd) {
   for (char* p = buf; *p; p++) *p = toupper((unsigned char)*p);
 
   float v1;
+  int pwmVal;
 
   if (strncmp(buf, "SET SP ", 7) == 0 && sscanf(buf + 7, "%f", &v1) == 1) {
     float sp = constrain(v1, 0.0f, 2.0f);
@@ -490,6 +498,18 @@ void procesarComandoSerial(const char* cmd) {
     motorStop();
     Serial.println("[STOP] Motor detenido");
 
+  // Control manual de PWM: "PWM <valor>" o "SET PWM <valor>"
+  } else if ( (strncmp(buf, "PWM ", 4) == 0 && sscanf(buf + 4, "%d", &pwmVal) == 1)
+           || (strncmp(buf, "SET PWM ", 8) == 0 && sscanf(buf + 8, "%d", &pwmVal) == 1) ) {
+    int pwm = (int)constrain(pwmVal, 0, MAX_VELOCITY);
+    // Asegurar dirección activa antes de aplicar PWM
+    configurarMotorReversa();
+    myPID.SetMode(QuickPID::Control::manual);
+    myPID.Reset();  // <-- NUEVO: Limpiar integrador al pasar a manual
+    pidOutput = (float)pwm;
+    applyPWM(pwm);
+    Serial.printf("[PWM] Manual PWM aplicado: %d\n", pwm);
+
   } else if (strncmp(buf, "TUNE ", 5) == 0) {
     float p, i, d;
     if (sscanf(buf + 5, "%f %f %f", &p, &i, &d) == 3) {
@@ -498,7 +518,7 @@ void procesarComandoSerial(const char* cmd) {
     }
 
   } else if (strcmp(buf, "HELP") == 0) {
-    Serial.println("CMD: SET SP <m/s> | GET VEL | GET ENC | RESET ENC | GET CUR | STOP | TUNE <Kp Ki Kd>");
+    Serial.println("CMD: SET SP <m/s> | GET VEL | GET ENC | RESET ENC | GET CUR | STOP | TUNE <Kp Ki Kd> | PWM <0..MAX>");
 
   } else {
     Serial.printf("[ERR] Desconocido: '%s'\n", cmd);
@@ -835,6 +855,8 @@ void setup() {
   // PID — arranca en MANUAL, límites neutros
   // El motor NO recibirá PWM hasta que se confirme un setpoint > 0
   myPID.SetOutputLimits(0, PID_OUTPUT_MAX);
+  myPID.SetSampleTimeUs(CONTROL_INTERVAL_MS * 1000UL);  // <-- NUEVO: Configurar sample time
+  myPID.SetTunings(50.0f, 8.0f, 0.0f);                  // <-- NUEVO: Re-escala Ki/Kd con período correcto
   myPID.SetMode(QuickPID::Control::manual);
   pidOutput = 0.0f;
   Serial.println("[PID] Modo MANUAL al inicio — esperando setpoint");
@@ -894,26 +916,16 @@ void loop() {
   procesarEntradasEncoder();
   leerSerial();
 
-  // Control PID
-  static unsigned long ultimoControl = 0;
-  static unsigned long lastPidDebug = 0;
-  if (ahora - ultimoControl >= CONTROL_INTERVAL_MS) {
-    ultimoControl = ahora;
-    calculateSpeed();
+  // Control PID - AHORA SIN GATE MANUAL
+  // calculateSpeed siempre actualiza la medición
+  calculateSpeed();
+  
+  // Compute decide si es momento de calcular según sample time configurado
+  myPID.Compute();
+  
+  // Aplicar PWM siempre (PID en manual o automático)
+  applyPWM((int)round(pidOutput));
 
-    // Compute() no hace nada en modo manual; en automático regula la velocidad
-    myPID.Compute();
-    applyPWM((int)round(pidOutput));
-
-      if (ahora - lastPidDebug > 2000) {
-    lastPidDebug = ahora;
-    if (setpointSpeed > 0 && myPID.GetMode() == (uint8_t)QuickPID::Control::automatic) {
-      float error = setpointSpeed - currentLinearSpeedMs;
-      Serial.printf("[PID DEBUG] SP:%.3f Curr:%.3f Err:%.3f Out:%.1f PWM:%d\n",
-        setpointSpeed, currentLinearSpeedMs, error, pidOutput, (int)round(pidOutput));
-      }
-    }
-  }
   updateCurrentReading();
 
   // WebSocket
