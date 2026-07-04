@@ -213,4 +213,5 @@
  include/motor_config.h \
  .pio/libdeps/esp32dev/ESP32Encoder/src/ESP32Encoder.h \
  C:/Users/Rafa/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/driver/include/driver/pcnt.h \
- C:/Users/Rafa/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/hal/include/hal/pcnt_types.h
+ C:/Users/Rafa/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/hal/include/hal/pcnt_types.h \
+ .pio/libdeps/esp32dev/PID/PID_v1.h

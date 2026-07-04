@@ -52,7 +52,7 @@
 #define HALL_TIMEOUT_US      2000000UL   // 2 segundos (igual que Arduino Uno)
 
 // Debounce mínimo entre pulsos válidos (µs) — igual que Arduino Uno
-#define HALL_DEBOUNCE_US     200
+#define HALL_DEBOUNCE_US     5000  // 5ms — rechaza rebotes; permite hasta ~2 m/s (T_min≈10ms)
 
 // Tamaño del buffer circular de períodos (1 vuelta completa con 6 imanes)
 #define HALL_BUFFER_SIZE     6

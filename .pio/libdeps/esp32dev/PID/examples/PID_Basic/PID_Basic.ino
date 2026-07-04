@@ -1,20 +1,19 @@
 /********************************************************
-   PID Basic Example
-   Reading analog input 0 to control analog PWM output 3
+ * PID Basic Example
+ * Reading analog input 0 to control analog PWM output 3
  ********************************************************/
 
-#include <QuickPID.h>
+#include <PID_v1.h>
 
 #define PIN_INPUT 0
 #define PIN_OUTPUT 3
 
 //Define Variables we'll be connecting to
-float Setpoint, Input, Output;
+double Setpoint, Input, Output;
 
-float Kp = 2, Ki = 5, Kd = 1;
-
-//Specify PID links
-QuickPID myPID(&Input, &Output, &Setpoint);
+//Specify the links and initial tuning parameters
+double Kp=2, Ki=5, Kd=1;
+PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
 void setup()
 {
@@ -22,11 +21,8 @@ void setup()
   Input = analogRead(PIN_INPUT);
   Setpoint = 100;
 
-  //apply PID gains
-  myPID.SetTunings(Kp, Ki, Kd);
-
   //turn the PID on
-  myPID.SetMode(myPID.Control::automatic);
+  myPID.SetMode(AUTOMATIC);
 }
 
 void loop()
@@ -35,3 +31,5 @@ void loop()
   myPID.Compute();
   analogWrite(PIN_OUTPUT, Output);
 }
+
+

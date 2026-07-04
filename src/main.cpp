@@ -24,6 +24,7 @@
 #include <algorithm>
 #include "motor_config.h"
 #include <ESP32Encoder.h>
+#include <PID_v1.h>
 
 // ============================================================
 // 1. RED / SERVIDOR
@@ -41,11 +42,17 @@ const unsigned long WS_SEND_INTERVAL = 200;
 // ============================================================
 // 2. CONSTANTES PWM / FÍSICAS
 // ============================================================
-#undef  HALL_DEBOUNCE_US
-#define HALL_DEBOUNCE_US  1000UL
+// Debounce dinámico: rechaza períodos menores a HALL_DEBOUNCE_RATIO × mediana
+// actual (equivale a un salto de velocidad >2x entre pulsos, físicamente
+// imposible en la cinta). HALL_DEBOUNCE_US (5 ms, motor_config.h) es el piso
+// en arranque/timeout; el techo mantiene protección proporcional en todo el
+// rango operativo 0.2–1.5 m/s (períodos ~13–100 ms).
+#define HALL_DEBOUNCE_RATIO    0.5f
+#define HALL_DEBOUNCE_MAX_US   60000UL
+static volatile uint32_t hallMinPeriodUs = HALL_DEBOUNCE_US;
 
 // Límites de salida del PID
-#define PID_OUTPUT_MIN   150          // PWM mínimo para vencer fricción estática
+#define PID_OUTPUT_MIN   100          // PWM mínimo para vencer fricción estática
 #define PID_OUTPUT_MAX   MAX_VELOCITY // 1023
 
 static_assert(HALL_BUFFER_SIZE > 1, "HALL_BUFFER_SIZE debe ser > 1");
@@ -57,17 +64,17 @@ static const float HALL_CONST_SPEED = (3.14159265f * DRIVE_ROLLER_DIAMETER_MM * 
 // ============================================================
 // 3. TEMPORIZACIÓN
 // ============================================================
-#define CONTROL_INTERVAL_MS    100UL
-#define PID_TIMER_INTERVAL_MS   50UL   // garantiza mínimo 20 Hz aunque fallen pulsos Hall
-#define LCD_UPDATE_INTERVAL    300UL
-#define DEBUG_INTERVAL        1000UL
-#define CURRENT_READ_INTERVAL 50UL
+#define CONTROL_INTERVAL_MS    100UL   // NO USADO — reservado; reemplazado por PID_TIMER_INTERVAL_MS
+#define PID_TIMER_INTERVAL_MS   25UL   // cadencia del loop PID (40 Hz mínimo aunque fallen pulsos Hall)
+#define LCD_UPDATE_INTERVAL    300UL   // refresco de pantalla LCD
+#define DEBUG_INTERVAL        1000UL   // log de depuración por serial
+#define CURRENT_READ_INTERVAL 50UL    // lectura del sensor de corriente (20 Hz)
 
 // ============================================================
 // 4. FILTRO DE MEDIANA + EMA
 // ============================================================
-#define FILTER_SIZE   5
-#define SMOOTH_ALPHA  0.5f
+#define FILTER_SIZE   3
+#define SMOOTH_ALPHA  1.0f  // EMA desactivada (peso 100% al valor nuevo)
 
 static uint32_t filterBuffer[FILTER_SIZE];
 static uint8_t  filterIndex = 0;
@@ -76,8 +83,18 @@ static uint8_t  filterCount = 0;
 static float filteredRPM_Last = 0.0f;
 static float filteredVel_Last = 0.0f;
 
+// --- Velocidad para display (LCD) ---
+// Promedio deslizante de los últimos MAGNETS_COUNT períodos (= 1 vuelta
+// completa): cancela el error por espaciado desigual de imanes y actualiza
+// en cada pulso. Solo para mostrar; el PID sigue usando la mediana.
+static uint32_t revPeriodBuffer[MAGNETS_COUNT] = {0};
+static uint8_t  revBufIndex    = 0;
+static uint8_t  revBufCount    = 0;
+static uint32_t revPeriodSum   = 0;
+static float    displaySpeedMs = 0.0f;
+
 // ============================================================
-// 5. VARIABLES DE VELOCIDAD / PID MANUAL
+// 5. VARIABLES DE VELOCIDAD / PID
 // ============================================================
 float currentRPM           = 0.0f;
 float currentLinearSpeedMs = 0.0f;
@@ -89,17 +106,25 @@ bool  setpointPending      = false;  // Hay un setpoint pendiente de confirmar
 // --- CSV LOG ---
 bool csvLogActive = false;
 
-// --- PID MANUAL ---
-float Kp = 800.0f;
-float Ki = 20.0f;
-float Kd = 0.0f;
+// --- MONITOR HALL ---
+static uint8_t magnetCount     = 0;     // cuenta imanes en la vuelta actual (0..MAGNETS_COUNT-1)
+static bool    hallDebugActive = false; // activado con "HALL ON" por serial
 
-float pidIntegral  = 0.0f;
-float pidLastError = 0.0f;
-unsigned long lastControlMicros = 0;
-bool firstControlCall = true;
+// --- PID Brett Beauregard ---
+double Kp = 150.0;
+double Ki = 150.0;
+double Kd = 0.0;
 
-// Feed-Forward cache (para debugging)
+double pidIn  = 0.0;  // Input  → currentLinearSpeedMs
+double pidOut = 0.0;  // Output → PWM
+double pidSp  = 0.0;  // Setpoint
+
+PID myPID(&pidIn, &pidOut, &pidSp, Kp, Ki, Kd, DIRECT);
+
+float pidIntegral = 0.0f;          // NO USADO — reservado para compatibilidad WS
+unsigned long lastControlMicros = 0; // para el fallback timer de loop()
+
+// Feed-Forward cache (tabla empírica conservada, no activa)
 float lastFF_PWM = 0.0f;
 
 // ============================================================
@@ -213,121 +238,75 @@ void motorStop() {
   applyPWM(0);
   motorParadaLibre();
 
-  // Resetear PID
-  pidIntegral      = 0.0f;
-  pidLastError     = 0.0f;
-  firstControlCall = true;
-  lastFF_PWM       = 0.0f;
+  // Resetear PID (MANUAL + Output=0 → próximo SetMode(AUTOMATIC) arranca desde 0)
+  myPID.SetMode(MANUAL);
+  pidOut      = 0.0;
+  pidIntegral = 0.0f;
   Serial.println("[PID] Motor detenido — PID reset");
 }
 
 // ---------------------
 // calcularFeedForward: calcula PWM de FF para un setpoint dado
+// (CONSERVADA — no activa; tabla medida empíricamente en lazo abierto)
 // ---------------------
-static float calcularFeedForward(float sp) {
-  // Tabla medida empíricamente (lazo abierto)
-  // { velocidad m/s, PWM }
-  static const float VEL[] = {0.41f, 0.52f, 0.64f, 0.73f, 0.86f, 0.98f,
-                               1.10f, 1.21f, 1.33f, 1.44f, 1.56f, 1.67f,
-                               1.78f, 1.90f};
-  static const float PWM[] = {200,   300,   350,   400,   450,   500,
-                               550,   600,   650,   700,   750,   800,
-                               850,   900};
-  static const uint8_t N = 14;
-
-  // Por debajo del mínimo medido
-  if (sp <= VEL[0])   return PWM[0];
-  // Por encima del máximo medido
-  if (sp >= VEL[N-1]) return PWM[N-1];
-
-  // Buscar segmento e interpolar
-  for (uint8_t i = 0; i < N - 1; i++) {
-    if (sp >= VEL[i] && sp <= VEL[i+1]) {
-      float t = (sp - VEL[i]) / (VEL[i+1] - VEL[i]);
-      return PWM[i] + t * (PWM[i+1] - PWM[i]);
-    }
-  }
-
-  return PWM[N-1];
-}
+// static float calcularFeedForward(float sp) {
+//   // Tabla medida empíricamente (lazo abierto)
+//   // { velocidad m/s, PWM }
+//   static const float VEL[] = {0.41f, 0.52f, 0.64f, 0.73f, 0.86f, 0.98f,
+//                                1.10f, 1.21f, 1.33f, 1.44f, 1.56f, 1.67f,
+//                                1.78f, 1.90f};
+//   static const float PWM[] = {200,   300,   350,   400,   450,   500,
+//                                550,   600,   650,   700,   750,   800,
+//                                850,   900};
+//   static const uint8_t N = 14;
+//
+//   if (sp <= VEL[0])   return PWM[0];
+//   if (sp >= VEL[N-1]) return PWM[N-1];
+//
+//   for (uint8_t i = 0; i < N - 1; i++) {
+//     if (sp >= VEL[i] && sp <= VEL[i+1]) {
+//       float t = (sp - VEL[i]) / (VEL[i+1] - VEL[i]);
+//       return PWM[i] + t * (PWM[i+1] - PWM[i]);
+//     }
+//   }
+//   return PWM[N-1];
+// }
 
 // ---------------------
-// activarPID: configura setpoint, FF inicial, firstControlCall = false
+// activarPID: configura setpoint y arranca el PID
 // ---------------------
 static void activarPID(float sp) {
-  // Calcular FF
-  lastFF_PWM = calcularFeedForward(sp);
-  
-  // PRECARGAR el integral con el FF: Ki * integral = FF_PWM
-  // Así el PID arranca en el punto de operación correcto
-  if (Ki > 0.0f) {
-    pidIntegral = lastFF_PWM / Ki;
-  } else {
-    pidIntegral = 0.0f;
-  }
-  
-  pidLastError = sp - currentLinearSpeedMs;
-  firstControlCall = false;  // El primer pulso mantiene el FF
+  // --- Feed-Forward (conservado, no activo) ---
+  // lastFF_PWM = calcularFeedForward(sp);
+  // pidOut = lastFF_PWM;  // bumpless transfer: carga el integral de Brett con el FF
+  // applyPWM((int)round(lastFF_PWM));
+  // -------------------------------------------
+
+  pidSp = sp;
+  pidIn = currentLinearSpeedMs;
+  myPID.SetMode(AUTOMATIC);
   lastControlMicros = micros();
 
-  // Salida inicial = FF
-  pidOutput = lastFF_PWM;
-  applyPWM((int)round(pidOutput));
-  
-  Serial.printf("[PID] Activado — SP: %.3f m/s | FF PWM: %.0f | IntInit: %.3f | Ki*Int: %.1f\n",
-                sp, lastFF_PWM, pidIntegral, Ki * pidIntegral);
+  Serial.printf("[PID] Activado — SP: %.3f m/s\n", sp);
 }
 
 // ---------------------
-// computePID: PID manual con dt real (event-driven)
-// Anti-windup: integral clampada a [PWM_MIN/Ki, PWM_MAX/Ki]
+// computePID: delega en PID de Brett Beauregard (maneja timing internamente)
 // ---------------------
 void computePID() {
   if (setpointSpeed == 0.0f) {
     pidOutput = 0.0f;
-    pidIntegral = 0.0f;
-    pidLastError = 0.0f;
-    firstControlCall = true;
-    // No llamar applyPWM aquí — motorStop() ya lo hace,
-    // y en modo PWM manual setpointSpeed=0 no debe apagar el motor.
     return;
   }
 
-  unsigned long ahora = micros();
+  pidIn = currentLinearSpeedMs;
+  pidSp = setpointSpeed;
 
-  if (firstControlCall) {
-    lastControlMicros = ahora;
-    pidLastError = setpointSpeed - currentLinearSpeedMs;
-    firstControlCall = false;
-    // Mantener PWM = FF en el primer pulso
-    // (NO sobrescribir con un cálculo incompleto)
-    return;
+  if (myPID.Compute()) {
+    pidOutput = (float)pidOut;
+    applyPWM((int)round(pidOutput));
+    lastControlMicros = micros();  // actualiza el fallback timer
   }
-
-  float dt = (ahora - lastControlMicros) / 1000000.0f;
-  lastControlMicros = ahora;
-
-  if (dt <= 0.0f || dt > 1.0f) return;
-
-  float error = setpointSpeed - currentLinearSpeedMs;
-
-  // El integral YA contiene el FF como base
-  // Solo acumulamos la corrección del error
-  if (Ki > 0.0f) {
-    pidIntegral += error * dt;
-    float iMax = (float)(PID_OUTPUT_MAX) / Ki;
-    float iMin = (float)(PID_OUTPUT_MIN) / Ki;
-    pidIntegral = constrain(pidIntegral, iMin, iMax);
-  }
-
-  float derivative = (error - pidLastError) / dt;
-  pidLastError = error;
-
-  // SALIDA = Ki * integral (que incluye FF) + Kp * error + Kd * derivative
-  pidOutput = (Kp * error) + (Ki * pidIntegral) + (Kd * derivative);
-  pidOutput = constrain(pidOutput, 0.0f, (float)PID_OUTPUT_MAX);
-
-  applyPWM((int)round(pidOutput));
 }
 
 // ---------------------
@@ -403,13 +382,16 @@ void IRAM_ATTR ISR_SensorHall() {
   }
 
   uint32_t periodo = ahora - lastHallMicros;
-  lastHallMicros = ahora;
 
-  if (periodo >= HALL_DEBOUNCE_US) {
+  if (periodo >= hallMinPeriodUs) {
+    lastHallMicros = ahora;
     hallPeriodBuffer[hallBufferHead] = periodo;
     hallBufferHead = (hallBufferHead + 1) % HALL_BUFFER_SIZE;
     if (hallBufferCount < HALL_BUFFER_SIZE) hallBufferCount++;
   }
+  // Pulso espurio: NO se avanza lastHallMicros, así el próximo flanco real
+  // mide el período completo desde el último pulso válido (evita que el
+  // rebote parta el período en dos fragmentos cortos).
 }
 
 void IRAM_ATTR ISR_EncoderBoton() {
@@ -469,17 +451,22 @@ static void calculateSpeed() {
     filterCount = 0;
     filterIndex = 0;
 
+    memset(revPeriodBuffer, 0, sizeof(revPeriodBuffer));
+    revBufIndex    = 0;
+    revBufCount    = 0;
+    revPeriodSum   = 0;
+    displaySpeedMs = 0.0f;
+
     portDISABLE_INTERRUPTS();
     hallBufferCount   = 0;
     hallBufferHead    = 0;
     lastProcessedHead = 0;
+    lastHallMicros    = 0;  // reset: el próximo imán será la referencia, el siguiente se mide
+    hallMinPeriodUs   = HALL_DEBOUNCE_US;  // vuelve al piso hasta tener mediana nueva
     memset((void*)hallPeriodBuffer, 0, sizeof(hallPeriodBuffer));
     portENABLE_INTERRUPTS();
-    
-    // Si hay timeout y setpoint > 0, marcar para recalcular en próximo pulso
-    if (setpointSpeed > 0.0f) {
-      firstControlCall = true;
-    }
+
+    // Tras timeout: Brett PID retoma en el próximo Compute() con Input~0
     return;
   }
 
@@ -494,20 +481,40 @@ static void calculateSpeed() {
   uint8_t  validCount = 0;
 
   // Procesar cada nuevo pulso
+  bool revCompleted = false;
   for (uint8_t i = 0; i < newPulses; i++) {
     uint8_t  idx = (prevProcessedHead + i) % HALL_BUFFER_SIZE;
     uint32_t p   = periods[idx];
-    if (p > 200 && p < HALL_TIMEOUT_US) {
+    if (p > HALL_DEBOUNCE_US && p < HALL_TIMEOUT_US) {
       filterBuffer[filterIndex] = p;
       filterIndex = (filterIndex + 1) % FILTER_SIZE;
       if (filterCount < FILTER_SIZE) filterCount++;
 
       rawPeriods[validCount++] = p;
 
+      // Ventana deslizante de 1 vuelta para la velocidad de display
+      revPeriodSum -= revPeriodBuffer[revBufIndex];
+      revPeriodBuffer[revBufIndex] = p;
+      revPeriodSum += p;
+      revBufIndex = (revBufIndex + 1) % MAGNETS_COUNT;
+      if (revBufCount < MAGNETS_COUNT) revBufCount++;
+
       // Log WebSocket (imán por imán)
       float rawRpmSample = HALL_CONST_RPM   / (float)p;
       float rawVelSample = HALL_CONST_SPEED / (float)p;
       logPulsoCrudo(p, rawRpmSample, rawVelSample);
+
+      // Monitor de imanes
+      magnetCount++;
+      if (hallDebugActive) {
+        Serial.printf("[HALL] %u/%u  p=%luus  v=%.3fm/s\n",
+                      magnetCount, (uint8_t)MAGNETS_COUNT,
+                      (unsigned long)p, HALL_CONST_SPEED / (float)p);
+      }
+      if (magnetCount >= MAGNETS_COUNT) {
+        magnetCount  = 0;
+        revCompleted = true;
+      }
     }
   }
 
@@ -515,6 +522,12 @@ static void calculateSpeed() {
 
   // Calcular velocidad filtrada (mediana + EMA)
   float periodoMediano = getMedian(filterBuffer, FILTER_SIZE, filterCount);
+
+  // Actualizar umbral del debounce dinámico (leído por la ISR)
+  uint32_t nuevoUmbral = (uint32_t)(HALL_DEBOUNCE_RATIO * periodoMediano);
+  if (nuevoUmbral < HALL_DEBOUNCE_US)     nuevoUmbral = HALL_DEBOUNCE_US;
+  if (nuevoUmbral > HALL_DEBOUNCE_MAX_US) nuevoUmbral = HALL_DEBOUNCE_MAX_US;
+  hallMinPeriodUs = nuevoUmbral;
 
   float rawRPM = HALL_CONST_RPM   / periodoMediano;
   float rawVel = HALL_CONST_SPEED / periodoMediano;
@@ -524,6 +537,17 @@ static void calculateSpeed() {
 
   currentRPM           = filteredRPM_Last;
   currentLinearSpeedMs = filteredVel_Last;
+
+  // Velocidad de display: promedio sobre la ventana de 1 vuelta.
+  // vel = K / (sum/count) = K * count / sum
+  if (revPeriodSum > 0) {
+    displaySpeedMs = HALL_CONST_SPEED * (float)revBufCount / (float)revPeriodSum;
+  }
+
+  if (hallDebugActive && revCompleted) {
+    Serial.printf("[HALL] -- vuelta completa | Vel:%.3f m/s | RPM:%.1f\n",
+                  currentLinearSpeedMs, currentRPM);
+  }
 
   // --- CSV SERIAL: una línea por imán, con vel filtrada actualizada como referencia ---
   if (csvLogActive && validCount > 0 && setpointSpeed > 0.001f) {
@@ -613,11 +637,10 @@ void procesarComandoSerial(const char* cmd) {
     setpointSpeed   = 0.0f;
     pendingSetpoint = 0.0f;
     setpointPending = false;
-    pidIntegral      = 0.0f;
-    pidLastError     = 0.0f;
-    firstControlCall = true;
-    lastFF_PWM       = 0.0f;
-    pidOutput        = (float)pwm;
+    myPID.SetMode(MANUAL);
+    pidOut      = (double)pwm;
+    pidIntegral = 0.0f;
+    pidOutput   = (float)pwm;
     if (pwm > 0) configurarMotorReversa();
     else         motorParadaLibre();
     applyPWM(pwm);
@@ -627,18 +650,18 @@ void procesarComandoSerial(const char* cmd) {
     float p, i, d;
     if (sscanf(buf + 5, "%f %f %f", &p, &i, &d) == 3) {
       Kp = p; Ki = i; Kd = d;
-      if (Ki > 0.0f) {
-        float iMax = (float)(PID_OUTPUT_MAX) / Ki;
-        float iMin = (float)(PID_OUTPUT_MIN) / Ki;
-        pidIntegral = constrain(pidIntegral, iMin, iMax);
-      } else {
-        pidIntegral = 0.0f;
-      }
-      Serial.printf("[TUNE] Kp=%.2f Ki=%.2f Kd=%.2f | IntLimit: [%.2f, %.2f]\n",
-                    Kp, Ki, Kd,
-                    (Ki > 0.0f) ? (float)(PID_OUTPUT_MIN) / Ki : 0.0f,
-                    (Ki > 0.0f) ? (float)(PID_OUTPUT_MAX) / Ki : 0.0f);
+      myPID.SetTunings(Kp, Ki, Kd);
+      Serial.printf("[TUNE] Kp=%.2f Ki=%.2f Kd=%.2f\n", Kp, Ki, Kd);
     }
+
+  } else if (strcmp(buf, "HALL ON") == 0) {
+    hallDebugActive = true;
+    magnetCount     = 0;
+    Serial.println("[HALL] Monitor activado — imprime cada iman y cada vuelta");
+
+  } else if (strcmp(buf, "HALL OFF") == 0) {
+    hallDebugActive = false;
+    Serial.println("[HALL] Monitor desactivado");
 
   } else if (strcmp(buf, "LOG START") == 0) {
     csvLogActive = true;
@@ -649,7 +672,7 @@ void procesarComandoSerial(const char* cmd) {
     Serial.println("[LOG] Detenido");
 
   } else if (strcmp(buf, "HELP") == 0) {
-    Serial.println("CMD: SET SP <m/s> | GET VEL | GET ENC | RESET ENC | GET CUR | STOP | TUNE <Kp Ki Kd> | PWM <0..MAX> | LOG START | LOG STOP");
+    Serial.println("CMD: SET SP <m/s> | GET VEL | GET ENC | RESET ENC | GET CUR | STOP | TUNE <Kp Ki Kd> | PWM <0..MAX> | LOG START | LOG STOP | HALL ON | HALL OFF");
 
   } else {
     Serial.printf("[ERR] Desconocido: '%s'\n", cmd);
@@ -785,17 +808,10 @@ void onWebSocketEvent(AsyncWebSocket* srv, AsyncWebSocketClient* client,
 
     if (doc["tune"].is<JsonObject>()) {
       JsonObject t = doc["tune"].as<JsonObject>();
-      Kp = t["kp"] | 50.0f;
-      Ki = t["ki"] | 5.0f;
-      Kd = t["kd"] | 0.0f;
-      
-      if (Ki > 0.0f) {
-        float iMax = (float)(PID_OUTPUT_MAX) / Ki;
-        float iMin = (float)(PID_OUTPUT_MIN) / Ki;
-        pidIntegral = constrain(pidIntegral, iMin, iMax);
-      } else {
-        pidIntegral = 0.0f;
-      }
+      Kp = t["kp"] | 50.0;
+      Ki = t["ki"] | 5.0;
+      Kd = t["kd"] | 0.0;
+      myPID.SetTunings(Kp, Ki, Kd);
       Serial.printf("[TUNE WS] Kp=%.2f Ki=%.2f Kd=%.2f\n", Kp, Ki, Kd);
       changed = true;
     }
@@ -925,7 +941,7 @@ void updateLCD() {
   if (setpointPending) {
     snprintf(row0, sizeof(row0), "SP:%-4.2f*->%-4.2f", setpointSpeed, pendingSetpoint);
   } else {
-    snprintf(row0, sizeof(row0), "SP:%-4.2f V:%-4.2f", setpointSpeed, currentLinearSpeedMs);
+    snprintf(row0, sizeof(row0), "SP:%-4.2f V:%-4.2f", setpointSpeed, displaySpeedMs);
   }
   lcd->setCursor(1, 0);
   lcd->print(row0);
@@ -999,19 +1015,17 @@ void setup() {
   pinMode(EMERGENCY_STOP_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(EMERGENCY_STOP_PIN), ISR_EmergencyStop, FALLING);
 
-  // PID Manual - arranca en reposo
-  pidIntegral      = 0.0f;
-  pidLastError     = 0.0f;
-  firstControlCall = true;
-  pidOutput        = 0.0f;
-  lastFF_PWM       = 0.0f;
+  // PID Brett Beauregard — arranca en reposo
+  myPID.SetOutputLimits(PID_OUTPUT_MIN, PID_OUTPUT_MAX);
+  myPID.SetSampleTime(PID_TIMER_INTERVAL_MS);
+  myPID.SetMode(MANUAL);  // permanece en MANUAL hasta activarPID()
+  pidOut            = 0.0;
+  pidOutput         = 0.0f;
+  pidIntegral       = 0.0f;
   lastControlMicros = micros();
-  
-  Serial.printf("[PID] Manual | Kp=%.2f Ki=%.2f Kd=%.2f | PWM_MIN:%d PWM_MAX:%d\n",
-                Kp, Ki, Kd, PID_OUTPUT_MIN, PID_OUTPUT_MAX);
-  Serial.printf("[PID] Anti-windup: Integral limitada a ±%.3f (contribución PWM ±%d)\n",
-                (float)(PID_OUTPUT_MAX - PID_OUTPUT_MIN) / Ki, 
-                PID_OUTPUT_MAX - PID_OUTPUT_MIN);
+
+  Serial.printf("[PID] Brett Beauregard | Kp=%.2f Ki=%.2f Kd=%.2f | PWM:[%d..%d] | Sample:%lums\n",
+                Kp, Ki, Kd, PID_OUTPUT_MIN, PID_OUTPUT_MAX, PID_TIMER_INTERVAL_MS);
   Serial.println("[PID] Esperando setpoint...");
 
   // LCD
@@ -1095,5 +1109,5 @@ void loop() {
   updateLCD();
   debugSerial();
 
-  delay(5);
+  delay(1);
 }
