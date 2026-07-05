@@ -64,7 +64,6 @@ static const float HALL_CONST_SPEED = (3.14159265f * DRIVE_ROLLER_DIAMETER_MM * 
 // ============================================================
 // 3. TEMPORIZACIÓN
 // ============================================================
-#define CONTROL_INTERVAL_MS    100UL   // NO USADO — reservado; reemplazado por PID_TIMER_INTERVAL_MS
 #define PID_TIMER_INTERVAL_MS   25UL   // cadencia del loop PID (40 Hz mínimo aunque fallen pulsos Hall)
 #define LCD_UPDATE_INTERVAL    300UL   // refresco de pantalla LCD
 #define DEBUG_INTERVAL        1000UL   // log de depuración por serial
@@ -208,6 +207,7 @@ void computePID();
 // 14. IMPLEMENTACIÓN DE FUNCIONES
 // ============================================================
 
+// applyPWM: escribe el duty cycle (0..MAX_VELOCITY) en el canal PWM del driver
 void applyPWM(int pwmVal) {
   pwmVal = constrain(pwmVal, 0, MAX_VELOCITY);
 #if ESP_IDF_VERSION_MAJOR >= 5
@@ -217,11 +217,14 @@ void applyPWM(int pwmVal) {
 #endif
 }
 
+// configurarMotorReversa: fija los pines IN1/IN2 del driver para girar en el
+// sentido usado por la cinta (única dirección que usa este proyecto)
 void configurarMotorReversa() {
   digitalWrite(MOTOR_IN1_PIN, LOW);
   digitalWrite(MOTOR_IN2_PIN, HIGH);
 }
 
+// motorParadaLibre: pone ambos pines IN1/IN2 en LOW (coast / parada libre, sin frenado activo)
 void motorParadaLibre() {
   digitalWrite(MOTOR_IN1_PIN, LOW);
   digitalWrite(MOTOR_IN2_PIN, LOW);
@@ -246,42 +249,9 @@ void motorStop() {
 }
 
 // ---------------------
-// calcularFeedForward: calcula PWM de FF para un setpoint dado
-// (CONSERVADA — no activa; tabla medida empíricamente en lazo abierto)
-// ---------------------
-// static float calcularFeedForward(float sp) {
-//   // Tabla medida empíricamente (lazo abierto)
-//   // { velocidad m/s, PWM }
-//   static const float VEL[] = {0.41f, 0.52f, 0.64f, 0.73f, 0.86f, 0.98f,
-//                                1.10f, 1.21f, 1.33f, 1.44f, 1.56f, 1.67f,
-//                                1.78f, 1.90f};
-//   static const float PWM[] = {200,   300,   350,   400,   450,   500,
-//                                550,   600,   650,   700,   750,   800,
-//                                850,   900};
-//   static const uint8_t N = 14;
-//
-//   if (sp <= VEL[0])   return PWM[0];
-//   if (sp >= VEL[N-1]) return PWM[N-1];
-//
-//   for (uint8_t i = 0; i < N - 1; i++) {
-//     if (sp >= VEL[i] && sp <= VEL[i+1]) {
-//       float t = (sp - VEL[i]) / (VEL[i+1] - VEL[i]);
-//       return PWM[i] + t * (PWM[i+1] - PWM[i]);
-//     }
-//   }
-//   return PWM[N-1];
-// }
-
-// ---------------------
 // activarPID: configura setpoint y arranca el PID
 // ---------------------
 static void activarPID(float sp) {
-  // --- Feed-Forward (conservado, no activo) ---
-  // lastFF_PWM = calcularFeedForward(sp);
-  // pidOut = lastFF_PWM;  // bumpless transfer: carga el integral de Brett con el FF
-  // applyPWM((int)round(lastFF_PWM));
-  // -------------------------------------------
-
   pidSp = sp;
   pidIn = currentLinearSpeedMs;
   myPID.SetMode(AUTOMATIC);
@@ -373,6 +343,8 @@ void procesarEntradasEncoder() {
 // ============================================================
 // 15. ISRs
 // ============================================================
+// ISR_SensorHall: en cada flanco del sensor Hall mide el período respecto al
+// pulso anterior y, si supera el debounce dinámico, lo guarda en el buffer circular
 void IRAM_ATTR ISR_SensorHall() {
   uint32_t ahora = micros();
 
@@ -394,12 +366,14 @@ void IRAM_ATTR ISR_SensorHall() {
   // rebote parta el período en dos fragmentos cortos).
 }
 
+// ISR_EncoderBoton: marca el botón del encoder como presionado (con debounce por tiempo)
 void IRAM_ATTR ISR_EncoderBoton() {
   if (millis() - lastButtonDebounce > ENCODER_BUTTON_DEBOUNCE_MS) {
     encoderButtonPressed = true;
   }
 }
 
+// ISR_EmergencyStop: levanta la bandera de parada de emergencia; el loop() la procesa
 void IRAM_ATTR ISR_EmergencyStop() {
   emergencyStopTriggered = true;
 }
@@ -407,6 +381,7 @@ void IRAM_ATTR ISR_EmergencyStop() {
 // ============================================================
 // 16. CÁLCULO DE VELOCIDAD + PID EVENT-DRIVEN
 // ============================================================
+// getMedian: copia y ordena hasta `size` muestras del buffer para devolver la mediana
 static float getMedian(uint32_t* arr, uint8_t size, uint8_t count) {
   uint32_t temp[FILTER_SIZE];
   uint8_t  n = (count < size) ? count : size;
@@ -428,6 +403,9 @@ static void logPulsoCrudo(uint32_t periodo_us, float rpm, float vel_m_s) {
   pulseLogCount++;
 }
 
+// calculateSpeed: procesa los pulsos Hall nuevos desde el último ciclo — actualiza
+// RPM/velocidad filtrada (mediana), la velocidad de display, el log crudo para el
+// WebSocket, maneja el timeout (sin pulsos = velocidad 0) y dispara computePID()
 static void calculateSpeed() {
   uint32_t periods[HALL_BUFFER_SIZE];
   uint8_t  currentHead;
@@ -568,6 +546,8 @@ static void calculateSpeed() {
 // ============================================================
 // 17. LECTURA DE CORRIENTE
 // ============================================================
+// updateCurrentReading: promedia 20 lecturas del sensor de corriente (cada CURRENT_READ_INTERVAL)
+// y las convierte a amperes usando el offset y la sensibilidad del sensor
 static void updateCurrentReading() {
   if (millis() - lastCurrentReadTime < CURRENT_READ_INTERVAL) return;
   lastCurrentReadTime = millis();
@@ -583,6 +563,8 @@ static void updateCurrentReading() {
 // ============================================================
 // 18. COMANDOS SERIAL
 // ============================================================
+// procesarComandoSerial: interpreta un comando de texto recibido por Serial
+// (SET SP, GET VEL/ENC/CUR, STOP, PWM, TUNE, HALL ON/OFF, LOG START/STOP, HELP)
 void procesarComandoSerial(const char* cmd) {
   char buf[64];
   strncpy(buf, cmd, sizeof(buf) - 1);
@@ -679,6 +661,8 @@ void procesarComandoSerial(const char* cmd) {
   }
 }
 
+// leerSerial: arma línea a línea los bytes entrantes de Serial y despacha cada
+// comando completo (terminado en \n o \r) a procesarComandoSerial()
 static void leerSerial() {
   while (Serial.available()) {
     char c = Serial.read();
@@ -697,6 +681,8 @@ static void leerSerial() {
 // ============================================================
 // 19. WEBSOCKET
 // ============================================================
+// broadcastState: arma el JSON de estado (velocidad, setpoint, PID, encoder, corriente,
+// log crudo de pulsos) y lo envía por WebSocket a todos los clientes conectados
 void broadcastState() {
   if (ws.count() == 0) {
     pulseLogCount    = 0;
@@ -742,6 +728,8 @@ void broadcastState() {
   ws.textAll(json);
 }
 
+// onWebSocketEvent: maneja conexión/desconexión de clientes y los mensajes JSON
+// entrantes (led, sp, sp_pending, confirm_sp, stop, tune) desde la interfaz web
 void onWebSocketEvent(AsyncWebSocket* srv, AsyncWebSocketClient* client,
                       AwsEventType type, void* arg, uint8_t* data, size_t len) {
   if (type == WS_EVT_CONNECT) {
@@ -892,6 +880,8 @@ window.onload=init;
 // ============================================================
 // 21. HTTP
 // ============================================================
+// setupHTTPEndpoints: sirve la SPA desde LittleFS ("/") y registra una página
+// de diagnóstico embebida (FALLBACK_PAGE) para cuando el filesystem no está disponible
 void setupHTTPEndpoints() {
   if (LittleFS.begin(true)) {
     server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
@@ -907,6 +897,7 @@ void setupHTTPEndpoints() {
 // ============================================================
 // 22. LCD
 // ============================================================
+// scanI2CAddress: barre el bus I2C buscando una dirección conocida de LCD (0x27 o 0x3F)
 uint8_t scanI2CAddress() {
   for (uint8_t addr = 0x20; addr < 0x40; addr++) {
     Wire.beginTransmission(addr);
@@ -917,6 +908,7 @@ uint8_t scanI2CAddress() {
   return 0;
 }
 
+// initLCD: inicializa el bus I2C, detecta la dirección del LCD y lo deja listo para usar
 void initLCD() {
   if (lcd) return;
   Wire.begin(LCD_SDA_PIN, LCD_SCL_PIN);
@@ -930,6 +922,8 @@ void initLCD() {
   Serial.printf("[LCD] OK @ 0x%02X\n", addr);
 }
 
+// updateLCD: refresca la pantalla (cada LCD_UPDATE_INTERVAL) con setpoint,
+// velocidad, PWM y corriente actuales
 void updateLCD() {
   if (!lcd) return;
   if (millis() - lastLcdUpdate < LCD_UPDATE_INTERVAL) return;
@@ -954,6 +948,8 @@ void updateLCD() {
 // ============================================================
 // 23. DEBUG SERIAL
 // ============================================================
+// debugSerial: imprime por Serial un resumen periódico (cada DEBUG_INTERVAL) del
+// estado de velocidad/PID/corriente, salvo que el log CSV esté activo
 void debugSerial() {
   if (csvLogActive) return;
   if (millis() - lastDebugTime < DEBUG_INTERVAL) return;
@@ -967,6 +963,8 @@ void debugSerial() {
 // ============================================================
 // 24. SETUP
 // ============================================================
+// setup: configura pines de motor/Hall/encoder/emergencia, arranca el PID en MANUAL,
+// inicializa LCD, levanta el WiFi AP y el servidor HTTP/WebSocket
 void setup() {
   Serial.begin(115200);
   Serial.println("\n[BOOT] Trotadora PID v9.11.0 - Anti-windup simétrico");
@@ -1060,6 +1058,9 @@ void setup() {
 // ============================================================
 // 25. LOOP PRINCIPAL
 // ============================================================
+// loop: procesa parada de emergencia, lee encoder/serial, calcula velocidad y
+// PID event-driven, con timer fallback para garantizar cadencia mínima del PID;
+// además lee corriente, transmite estado por WebSocket y refresca LCD/debug
 void loop() {
   unsigned long ahora = millis();
 
