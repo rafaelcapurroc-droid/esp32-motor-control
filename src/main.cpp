@@ -54,12 +54,16 @@ static volatile uint32_t hallMinPeriodUs = HALL_DEBOUNCE_US;
 // Límites de salida del PID
 #define PID_OUTPUT_MIN   100          // PWM mínimo para vencer fricción estática
 #define PID_OUTPUT_MAX   MAX_VELOCITY // 1023
+#define PID_STARTUP_PWM  100          // Semilla del integrador al activar el PID (bumpless transfer)
 
 static_assert(HALL_BUFFER_SIZE > 1, "HALL_BUFFER_SIZE debe ser > 1");
 
-static const float HALL_CONST_RPM   = 60000000.0f / (float)MAGNETS_COUNT;
+// Basadas en HALL_SLOTS_COUNT (posiciones geométricas), no en MAGNETS_COUNT:
+// valen para un período "normal" (1 slot). El período del hueco (diente
+// faltante) equivale a 2 slots y se trata aparte en calculateSpeed().
+static const float HALL_CONST_RPM   = 60000000.0f / (float)HALL_SLOTS_COUNT;
 static const float HALL_CONST_SPEED = (3.14159265f * DRIVE_ROLLER_DIAMETER_MM * 1000.0f)
-                                       / (float)MAGNETS_COUNT;
+                                       / (float)HALL_SLOTS_COUNT;
 
 // ============================================================
 // 3. TEMPORIZACIÓN
@@ -79,14 +83,20 @@ static uint32_t filterBuffer[FILTER_SIZE];
 static uint8_t  filterIndex = 0;
 static uint8_t  filterCount = 0;
 
+// Último período normal individual (no la mediana) — referencia para detectar
+// el hueco del diente faltante. Sigue el ritmo pulso a pulso, así no se
+// atrasa durante una aceleración fuerte (la mediana de varios sí se atrasa).
+static uint32_t lastNormalPeriodUs = 0;
+
 static float filteredRPM_Last = 0.0f;
 static float filteredVel_Last = 0.0f;
 
 // --- Velocidad para display (LCD) ---
-// Promedio deslizante de los últimos MAGNETS_COUNT períodos (= 1 vuelta
-// completa): cancela el error por espaciado desigual de imanes y actualiza
-// en cada pulso. Solo para mostrar; el PID sigue usando la mediana.
-static uint32_t revPeriodBuffer[MAGNETS_COUNT] = {0};
+// Promedio deslizante de los últimos (MAGNETS_COUNT-1) períodos normales
+// (= 1 vuelta completa, sin contar el hueco del diente faltante): cancela
+// el error por espaciado desigual de imanes y actualiza en cada pulso
+// normal. Solo para mostrar; el PID sigue usando la mediana.
+static uint32_t revPeriodBuffer[MAGNETS_COUNT - 1] = {0};
 static uint8_t  revBufIndex    = 0;
 static uint8_t  revBufCount    = 0;
 static uint32_t revPeriodSum   = 0;
@@ -106,12 +116,12 @@ bool  setpointPending      = false;  // Hay un setpoint pendiente de confirmar
 bool csvLogActive = false;
 
 // --- MONITOR HALL ---
-static uint8_t magnetCount     = 0;     // cuenta imanes en la vuelta actual (0..MAGNETS_COUNT-1)
+static uint8_t magnetCount     = 0;     // cuenta pulsos normales en la vuelta actual (0..MAGNETS_COUNT-2), la resincroniza el hueco
 static bool    hallDebugActive = false; // activado con "HALL ON" por serial
 
 // --- PID Brett Beauregard ---
-double Kp = 150.0;
-double Ki = 150.0;
+double Kp = 50.0;
+double Ki = 50.0;
 double Kd = 0.0;
 
 double pidIn  = 0.0;  // Input  → currentLinearSpeedMs
@@ -254,6 +264,11 @@ void motorStop() {
 static void activarPID(float sp) {
   pidSp = sp;
   pidIn = currentLinearSpeedMs;
+
+  // Semilla del integrador: al pasar MANUAL→AUTOMATIC la librería toma
+  // pidOut como ITerm inicial, así el PID arranca en PID_STARTUP_PWM en
+  // vez de rampear desde 0.
+  pidOut = PID_STARTUP_PWM;
   myPID.SetMode(AUTOMATIC);
   lastControlMicros = micros();
 
@@ -428,12 +443,14 @@ static void calculateSpeed() {
     memset(filterBuffer, 0, sizeof(filterBuffer));
     filterCount = 0;
     filterIndex = 0;
+    lastNormalPeriodUs = 0;
 
     memset(revPeriodBuffer, 0, sizeof(revPeriodBuffer));
     revBufIndex    = 0;
     revBufCount    = 0;
     revPeriodSum   = 0;
     displaySpeedMs = 0.0f;
+    magnetCount    = 0;
 
     portDISABLE_INTERRUPTS();
     hallBufferCount   = 0;
@@ -464,34 +481,63 @@ static void calculateSpeed() {
     uint8_t  idx = (prevProcessedHead + i) % HALL_BUFFER_SIZE;
     uint32_t p   = periods[idx];
     if (p > HALL_DEBOUNCE_US && p < HALL_TIMEOUT_US) {
-      filterBuffer[filterIndex] = p;
-      filterIndex = (filterIndex + 1) % FILTER_SIZE;
-      if (filterCount < FILTER_SIZE) filterCount++;
 
-      rawPeriods[validCount++] = p;
+      // Diente faltante: el hueco del imán ausente mide ~2x un período
+      // normal. Se compara contra el ÚLTIMO período normal individual
+      // (no una mediana/promedio de varios) para no atrasarse durante una
+      // aceleración fuerte, donde los períodos se acortan rápido pulso a
+      // pulso — una mediana de 3 vieja subestimaría el umbral y dejaría
+      // pasar el hueco real como si fuera normal, ensuciando el filtro.
+      bool esHueco = (lastNormalPeriodUs > 0) &&
+                     ((float)p > 1.5f * (float)lastNormalPeriodUs);
 
-      // Ventana deslizante de 1 vuelta para la velocidad de display
-      revPeriodSum -= revPeriodBuffer[revBufIndex];
-      revPeriodBuffer[revBufIndex] = p;
-      revPeriodSum += p;
-      revBufIndex = (revBufIndex + 1) % MAGNETS_COUNT;
-      if (revBufCount < MAGNETS_COUNT) revBufCount++;
-
-      // Log WebSocket (imán por imán)
-      float rawRpmSample = HALL_CONST_RPM   / (float)p;
-      float rawVelSample = HALL_CONST_SPEED / (float)p;
-      logPulsoCrudo(p, rawRpmSample, rawVelSample);
-
-      // Monitor de imanes
-      magnetCount++;
-      if (hallDebugActive) {
-        Serial.printf("[HALL] %u/%u  p=%luus  v=%.3fm/s\n",
-                      magnetCount, (uint8_t)MAGNETS_COUNT,
-                      (unsigned long)p, HALL_CONST_SPEED / (float)p);
-      }
-      if (magnetCount >= MAGNETS_COUNT) {
+      if (esHueco) {
         magnetCount  = 0;
         revCompleted = true;
+        if (hallDebugActive) {
+          Serial.printf("[HALL] -- HUECO (diente faltante) p=%luus ref=%luus -- vuelta sincronizada\n",
+                        (unsigned long)p, (unsigned long)lastNormalPeriodUs);
+        }
+        // El hueco equivale a 2 slots: se loguea con el período a la mitad
+        // para que el CSV/WS muestren una velocidad instantánea coherente,
+        // pero NO entra al filtro de mediana ni a la ventana de display
+        // (no es una muestra de 1 slot).
+        logPulsoCrudo(p, HALL_CONST_RPM / (p / 2.0f), HALL_CONST_SPEED / (p / 2.0f));
+      } else {
+        lastNormalPeriodUs = p;
+
+        filterBuffer[filterIndex] = p;
+        filterIndex = (filterIndex + 1) % FILTER_SIZE;
+        if (filterCount < FILTER_SIZE) filterCount++;
+
+        rawPeriods[validCount++] = p;
+
+        // Ventana deslizante de 1 vuelta para la velocidad de display
+        // (MAGNETS_COUNT-1 períodos normales por vuelta; el hueco no cuenta)
+        revPeriodSum -= revPeriodBuffer[revBufIndex];
+        revPeriodBuffer[revBufIndex] = p;
+        revPeriodSum += p;
+        revBufIndex = (revBufIndex + 1) % (MAGNETS_COUNT - 1);
+        if (revBufCount < (MAGNETS_COUNT - 1)) revBufCount++;
+
+        // Log WebSocket (imán por imán)
+        float rawRpmSample = HALL_CONST_RPM   / (float)p;
+        float rawVelSample = HALL_CONST_SPEED / (float)p;
+        logPulsoCrudo(p, rawRpmSample, rawVelSample);
+
+        // Monitor de imanes
+        magnetCount++;
+        if (hallDebugActive) {
+          Serial.printf("[HALL] %u/%u  p=%luus  v=%.3fm/s\n",
+                        magnetCount, (uint8_t)(MAGNETS_COUNT - 1),
+                        (unsigned long)p, HALL_CONST_SPEED / (float)p);
+        }
+        // Red de seguridad: si por algún motivo no se detectó el hueco a
+        // tiempo, igual sincroniza tras contar los períodos normales de 1 vuelta.
+        if (magnetCount >= (MAGNETS_COUNT - 1)) {
+          magnetCount  = 0;
+          revCompleted = true;
+        }
       }
     }
   }
@@ -809,93 +855,21 @@ void onWebSocketEvent(AsyncWebSocket* srv, AsyncWebSocketClient* client,
 }
 
 // ============================================================
-// 20. PÁGINA DE DIAGNÓSTICO (FALLBACK)
+// 20. HTTP
 // ============================================================
-static const char FALLBACK_PAGE[] PROGMEM = R"HTML(
-<!DOCTYPE html><html lang="es"><head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta charset="UTF-8">
-<title>Trotadora PID v9.11.0</title>
-<style>
-body{font-family:monospace;background:#0d0f14;color:#c8d0e0;padding:30px;max-width:620px;margin:0 auto}
-h2{color:#00e5ff}
-.metric{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e2330}
-button{padding:10px;background:#1e2330;border-radius:4px;cursor:pointer;margin:5px}
-.row{display:flex;gap:8px;flex-wrap:wrap}
-.pending{color:#ffaa00}
-.confirmed{color:#39ff6e}
-.ff{color:#ff8844}
-.highlight{color:#00e5ff}
-</style></head><body>
-<h2>Trotadora PID v9.11.0</h2>
-<div id="status">Conectando WebSocket...</div>
-<div id="metrics"></div>
-<div class="row">
-  <button onclick="send({sp:0.5})">SP 0.5 m/s</button>
-  <button onclick="send({sp:1.0})">SP 1.0 m/s</button>
-  <button onclick="send({sp:1.5})">SP 1.5 m/s</button>
-  <button onclick="send({stop:true})">STOP</button>
-</div>
-<div class="row">
-  <input type="range" id="spSlider" min="0" max="200" step="1" value="0">
-  <span id="sliderValue">0.00 m/s</span>
-  <button onclick="send({sp_pending: parseFloat(document.getElementById('sliderValue').innerText)})">Set Pending</button>
-  <button onclick="send({confirm_sp: true})">CONFIRMAR</button>
-</div>
-<script>
-var ws;
-function init(){
-  ws=new WebSocket('ws://'+location.hostname+'/ws');
-  ws.onopen=function(){document.getElementById('status').innerHTML='<span style="color:#39ff6e">Conectado</span>'};
-  ws.onmessage=function(e){
-    var d=JSON.parse(e.data);
-    var pendingHtml = d.sp_pending ?
-      '<span class="pending">PENDIENTE: '+d.sp_pending_m_s.toFixed(3)+' m/s</span>' :
-      '<span class="confirmed">CONFIRMADO: '+d.sp_m_s.toFixed(3)+' m/s</span>';
-    document.getElementById('metrics').innerHTML=`
-      <div class="metric"><span>Velocidad actual</span><span>${(d.speed_m_s||0).toFixed(3)} m/s</span></div>
-      <div class="metric"><span>Setpoint</span><span>${pendingHtml}</span></div>
-      <div class="metric"><span>PWM</span><span>${d.velocity||0}</span></div>
-      <div class="metric"><span>FF PWM</span><span class="ff">${(d.ff_pwm||0).toFixed(0)}</span></div>
-      <div class="metric"><span>Ki × Integral</span><span class="highlight">${((d.ki||0) * (d.pid_integral||0)).toFixed(0)}</span></div>
-      <div class="metric"><span>Encoder</span><span>${d.encoder||0}</span></div>
-      <div class="metric"><span>Corriente</span><span>${(d.current||0).toFixed(2)} A</span></div>
-      <div class="metric"><span>Kp=${(d.kp||0).toFixed(1)}</span><span>Ki=${(d.ki||0).toFixed(1)} Kd=${(d.kd||0).toFixed(1)}</span></div>
-    `;
-    document.getElementById('spSlider').value = d.sp_pending_m_s * 100;
-    document.getElementById('sliderValue').innerText = d.sp_pending_m_s.toFixed(2);
-  };
-  ws.onclose=function(){document.getElementById('status').innerHTML='<span style="color:#ff3355">Desconectado</span>';setTimeout(init,2000)};
-}
-function send(obj){if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));}
-var slider=document.getElementById('spSlider');
-slider.oninput=function(){
-  var val=this.value/100;
-  document.getElementById('sliderValue').innerText=val.toFixed(2);
-};
-window.onload=init;
-</script></body></html>
-)HTML";
-
-// ============================================================
-// 21. HTTP
-// ============================================================
-// setupHTTPEndpoints: sirve la SPA desde LittleFS ("/") y registra una página
-// de diagnóstico embebida (FALLBACK_PAGE) para cuando el filesystem no está disponible
+// setupHTTPEndpoints: sirve la SPA (index.html) y el monitor (monitor.html)
+// desde LittleFS; sin fallback embebido
 void setupHTTPEndpoints() {
   if (LittleFS.begin(true)) {
     server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
     Serial.println("[FS] LittleFS OK");
   } else {
-    Serial.println("[FS] LittleFS no disponible — usando fallback");
+    Serial.println("[FS] LittleFS no disponible");
   }
-  server.onNotFound([](AsyncWebServerRequest* request) {
-    request->send_P(200, "text/html", FALLBACK_PAGE);
-  });
 }
 
 // ============================================================
-// 22. LCD
+// 21. LCD
 // ============================================================
 // scanI2CAddress: barre el bus I2C buscando una dirección conocida de LCD (0x27 o 0x3F)
 uint8_t scanI2CAddress() {
@@ -946,7 +920,7 @@ void updateLCD() {
 }
 
 // ============================================================
-// 23. DEBUG SERIAL
+// 22. DEBUG SERIAL
 // ============================================================
 // debugSerial: imprime por Serial un resumen periódico (cada DEBUG_INTERVAL) del
 // estado de velocidad/PID/corriente, salvo que el log CSV esté activo
@@ -961,7 +935,7 @@ void debugSerial() {
 }
 
 // ============================================================
-// 24. SETUP
+// 23. SETUP
 // ============================================================
 // setup: configura pines de motor/Hall/encoder/emergencia, arranca el PID en MANUAL,
 // inicializa LCD, levanta el WiFi AP y el servidor HTTP/WebSocket
@@ -1056,7 +1030,7 @@ void setup() {
 }
 
 // ============================================================
-// 25. LOOP PRINCIPAL
+// 24. LOOP PRINCIPAL
 // ============================================================
 // loop: procesa parada de emergencia, lee encoder/serial, calcula velocidad y
 // PID event-driven, con timer fallback para garantizar cadencia mínima del PID;

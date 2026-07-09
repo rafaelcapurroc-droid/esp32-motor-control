@@ -32,7 +32,12 @@
 #define CS_OFFSET_VOLTAGE   0.0f
 
 // --- CONFIGURACIÓN MECÁNICA ---
-#define MAGNETS_COUNT        6
+// Diente faltante: 5 imanes físicos montados en 6 posiciones equiespaciadas
+// (una posición queda vacía). HALL_SLOTS_COUNT es la geometría (6, usada
+// para convertir período→RPM/velocidad de los períodos normales);
+// MAGNETS_COUNT es la cantidad real de imanes/pulsos por vuelta (5).
+#define HALL_SLOTS_COUNT     6
+#define MAGNETS_COUNT        5
 #define DRIVE_ROLLER_DIAMETER_MM 38.5f  // Rodillo motriz de la cinta
 #define PULLEY_DIAMETER_MM   60.0f      // Polea sensora (eje motriz)
 
@@ -54,7 +59,7 @@
 // Debounce mínimo entre pulsos válidos (µs) — igual que Arduino Uno
 #define HALL_DEBOUNCE_US     5000  // 5ms — rechaza rebotes; permite hasta ~2 m/s (T_min≈10ms)
 
-// Tamaño del buffer circular de períodos (1 vuelta completa con 6 imanes)
+// Tamaño del buffer circular de períodos (1 vuelta completa: 5 pulsos, 6 slots)
 #define HALL_BUFFER_SIZE     6
 
 #endif // MOTOR_CONFIG_H
