@@ -114,6 +114,7 @@ bool  setpointPending      = false;  // Hay un setpoint pendiente de confirmar
 
 // --- CSV LOG ---
 bool csvLogActive = false;
+bool velLogActive = false;  // LOG VEL START/STOP: velocidad filtrada (la que ve el PID) en el tiempo
 
 // --- MONITOR HALL ---
 static uint8_t magnetCount     = 0;     // cuenta pulsos normales en la vuelta actual (0..MAGNETS_COUNT-2), la resincroniza el hueco
@@ -169,9 +170,27 @@ unsigned long lastStableTime     = 0;
 const unsigned long ENCODER_STABILITY_DELAY_MS = 5;
 int           displayEncoderCount = 0;
 
-volatile bool encoderButtonPressed  = false;
-unsigned long lastButtonDebounce    = 0;
+// Botón: se lee por polling (no interrupción) para poder distinguir un
+// click corto (confirmar setpoint / navegar menú) de uno mantenido
+// DEV_MENU_HOLD_MS (abre/cierra el menú de desarrollador).
+bool          buttonIsDown         = false;
+unsigned long buttonDownSinceMs    = 0;
+bool          longPressFired       = false;
+unsigned long lastButtonDebounce   = 0;
 const unsigned long ENCODER_BUTTON_DEBOUNCE_MS = 50;
+#define DEV_MENU_HOLD_MS 10000UL
+
+// ============================================================
+// 7b. MENÚ DESARROLLADOR (edición de Kp/Ki/Kd en vivo desde el LCD)
+// ============================================================
+enum DevMenuState : uint8_t { DEV_MENU_OFF, DEV_MENU_SELECT, DEV_MENU_EDIT };
+
+static DevMenuState devMenuState  = DEV_MENU_OFF;
+static uint8_t       devMenuIndex = 0;   // índice del parámetro seleccionado
+
+static const char* const DEV_MENU_ITEMS[] = { "Kp", "Ki", "Kd", "SALIR" };
+static const uint8_t  DEV_MENU_ITEM_COUNT = 4;
+static const double   DEV_MENU_STEP[]     = { 0.1, 0.1, 0.1 }; // por click, Kp/Ki/Kd
 
 // ============================================================
 // 8. PARADA DE EMERGENCIA
@@ -316,11 +335,59 @@ void confirmarSetpoint() {
 }
 
 // ---------------------
-// procesarEntradasEncoder
+// toggleDevMenu: abre/cierra el menú de desarrollador (mantener botón 10s)
+// ---------------------
+static void toggleDevMenu() {
+  if (devMenuState == DEV_MENU_OFF) {
+    devMenuState = DEV_MENU_SELECT;
+    devMenuIndex = 0;
+    Serial.println("[DEVMENU] Abierto — ajustá Kp/Ki/Kd en vivo desde el LCD");
+  } else {
+    devMenuState = DEV_MENU_OFF;
+    Serial.println("[DEVMENU] Cerrado");
+  }
+  if (lcd) lcd->clear();
+}
+
+// ---------------------
+// aplicarDeltaDevMenu: ajusta el parámetro seleccionado y lo aplica al PID en vivo
+// ---------------------
+static void aplicarDeltaDevMenu(int delta) {
+  double* param = (devMenuIndex == 0) ? &Kp : (devMenuIndex == 1) ? &Ki : &Kd;
+  *param += DEV_MENU_STEP[devMenuIndex] * delta;
+  if (*param < 0.0) *param = 0.0;
+  myPID.SetTunings(Kp, Ki, Kd);
+  Serial.printf("[DEVMENU] %s=%.2f\n", DEV_MENU_ITEMS[devMenuIndex], *param);
+}
+
+// ---------------------
+// clickCortoEncoder: click corto del botón — su efecto depende del modo actual
+// ---------------------
+static void clickCortoEncoder() {
+  if (devMenuState == DEV_MENU_OFF) {
+    confirmarSetpoint();
+  } else if (devMenuState == DEV_MENU_SELECT) {
+    if (devMenuIndex == DEV_MENU_ITEM_COUNT - 1) {  // "SALIR"
+      devMenuState = DEV_MENU_OFF;
+      Serial.println("[DEVMENU] Cerrado");
+    } else {
+      devMenuState = DEV_MENU_EDIT;
+    }
+    if (lcd) lcd->clear();
+  } else { // DEV_MENU_EDIT
+    devMenuState = DEV_MENU_SELECT;
+    if (lcd) lcd->clear();
+  }
+}
+
+// ---------------------
+// procesarEntradasEncoder: rotación (setpoint o navegación del menú dev) +
+// botón por polling (click corto / mantenido 10s)
 // ---------------------
 void procesarEntradasEncoder() {
-  int rawCount      = encoder.getCount();
-  unsigned long ahora = millis();
+  int rawCount        = encoder.getCount();
+  unsigned long ahora  = millis();
+  int delta            = 0;
 
   if (rawCount != lastStableCount) {
     lastStableTime  = ahora;
@@ -329,11 +396,18 @@ void procesarEntradasEncoder() {
 
   if ((ahora - lastStableTime) >= ENCODER_STABILITY_DELAY_MS) {
     int newDisplayCount = rawCount / 2;
-
     if (newDisplayCount != displayEncoderCount) {
-      int delta = newDisplayCount - displayEncoderCount;
+      delta = newDisplayCount - displayEncoderCount;
       displayEncoderCount = newDisplayCount;
+    }
+  }
 
+  if (delta != 0) {
+    if (devMenuState == DEV_MENU_SELECT) {
+      devMenuIndex = (uint8_t)((devMenuIndex + delta + DEV_MENU_ITEM_COUNT) % DEV_MENU_ITEM_COUNT);
+    } else if (devMenuState == DEV_MENU_EDIT) {
+      aplicarDeltaDevMenu(delta);
+    } else {
       pendingSetpoint += delta * 0.05f;
       pendingSetpoint  = constrain(pendingSetpoint, 0.0f, 2.0f);
       setpointPending  = true;
@@ -344,14 +418,28 @@ void procesarEntradasEncoder() {
     }
   }
 
-  // Botón: confirmar setpoint pendiente
-  if (encoderButtonPressed) {
-    unsigned long ahoraMs = millis();
-    if (ahoraMs - lastButtonDebounce > ENCODER_BUTTON_DEBOUNCE_MS) {
-      confirmarSetpoint();
-      lastButtonDebounce = ahoraMs;
+  // Botón por polling: distingue click corto (confirma al soltar antes de
+  // los 10s) de mantenido (dispara el menú dev apenas se cumplen los 10s,
+  // sin esperar a que se suelte).
+  bool rawPressed = (digitalRead(ENCODER_SW_PIN) == LOW);
+
+  if (rawPressed && !buttonIsDown) {
+    if (ahora - lastButtonDebounce > ENCODER_BUTTON_DEBOUNCE_MS) {
+      buttonIsDown       = true;
+      buttonDownSinceMs  = ahora;
+      longPressFired     = false;
+      lastButtonDebounce = ahora;
     }
-    encoderButtonPressed = false;
+  } else if (rawPressed && buttonIsDown) {
+    if (!longPressFired && (ahora - buttonDownSinceMs) >= DEV_MENU_HOLD_MS) {
+      longPressFired = true;
+      toggleDevMenu();
+    }
+  } else if (!rawPressed && buttonIsDown) {
+    buttonIsDown = false;
+    if (!longPressFired) {
+      clickCortoEncoder();
+    }
   }
 }
 
@@ -379,13 +467,6 @@ void IRAM_ATTR ISR_SensorHall() {
   // Pulso espurio: NO se avanza lastHallMicros, así el próximo flanco real
   // mide el período completo desde el último pulso válido (evita que el
   // rebote parta el período en dos fragmentos cortos).
-}
-
-// ISR_EncoderBoton: marca el botón del encoder como presionado (con debounce por tiempo)
-void IRAM_ATTR ISR_EncoderBoton() {
-  if (millis() - lastButtonDebounce > ENCODER_BUTTON_DEBOUNCE_MS) {
-    encoderButtonPressed = true;
-  }
 }
 
 // ISR_EmergencyStop: levanta la bandera de parada de emergencia; el loop() la procesa
@@ -562,6 +643,15 @@ static void calculateSpeed() {
   currentRPM           = filteredRPM_Last;
   currentLinearSpeedMs = filteredVel_Last;
 
+  // --- LOG VEL: una línea por actualización con la velocidad filtrada que
+  // efectivamente ve el PID (currentLinearSpeedMs) — para graficar vel(t)
+  // y validar el sensor, a diferencia de LOG START que loguea velocidad
+  // cruda sin filtrar, imán por imán.
+  if (velLogActive) {
+    Serial.printf("%lu,%.4f,%.1f,%.4f,%.0f\n",
+      millis(), currentLinearSpeedMs, currentRPM, setpointSpeed, pidOutput);
+  }
+
   // Velocidad de display: promedio sobre la ventana de 1 vuelta.
   // vel = K / (sum/count) = K * count / sum
   if (revPeriodSum > 0) {
@@ -699,8 +789,16 @@ void procesarComandoSerial(const char* cmd) {
     csvLogActive = false;
     Serial.println("[LOG] Detenido");
 
+  } else if (strcmp(buf, "LOG VEL START") == 0) {
+    velLogActive = true;
+    Serial.println("t_ms,vel_filtrada_m_s,rpm,setpoint_m_s,pwm");
+
+  } else if (strcmp(buf, "LOG VEL STOP") == 0) {
+    velLogActive = false;
+    Serial.println("[LOG VEL] Detenido");
+
   } else if (strcmp(buf, "HELP") == 0) {
-    Serial.println("CMD: SET SP <m/s> | GET VEL | GET ENC | RESET ENC | GET CUR | STOP | TUNE <Kp Ki Kd> | PWM <0..MAX> | LOG START | LOG STOP | HALL ON | HALL OFF");
+    Serial.println("CMD: SET SP <m/s> | GET VEL | GET ENC | RESET ENC | GET CUR | STOP | TUNE <Kp Ki Kd> | PWM <0..MAX> | LOG START | LOG STOP | LOG VEL START | LOG VEL STOP | HALL ON | HALL OFF");
 
   } else {
     Serial.printf("[ERR] Desconocido: '%s'\n", cmd);
@@ -919,13 +1017,50 @@ void updateLCD() {
   lcd->print(row1);
 }
 
+// updateLCDDevMenu: pantalla del menú de desarrollador (navegar/editar Kp/Ki/Kd)
+void updateLCDDevMenu() {
+  if (!lcd) return;
+  if (millis() - lastLcdUpdate < LCD_UPDATE_INTERVAL) return;
+  lastLcdUpdate = millis();
+
+  char line0[16];
+  char line1[16];
+  char row0[17];
+  char row1[17];
+
+  if (devMenuState == DEV_MENU_SELECT) {
+    snprintf(line0, sizeof(line0), ">%s", DEV_MENU_ITEMS[devMenuIndex]);
+    if (devMenuIndex == DEV_MENU_ITEM_COUNT - 1) {
+      snprintf(line1, sizeof(line1), "OK=salir");
+    } else {
+      double val = (devMenuIndex == 0) ? Kp : (devMenuIndex == 1) ? Ki : Kd;
+      snprintf(line1, sizeof(line1), "%.2f OK=edit", val);
+    }
+  } else { // DEV_MENU_EDIT
+    double val = (devMenuIndex == 0) ? Kp : (devMenuIndex == 1) ? Ki : Kd;
+    snprintf(line0, sizeof(line0), "EDIT %s", DEV_MENU_ITEMS[devMenuIndex]);
+    snprintf(line1, sizeof(line1), "%.2f OK=fin", val);
+  }
+
+  // Padding fijo a 15 columnas (fila visible real: setCursor arranca en
+  // columna 1 de 16) para pisar siempre lo que haya quedado de la vuelta
+  // anterior, sin importar cuánto más corto sea el texto nuevo.
+  snprintf(row0, sizeof(row0), "%-15s", line0);
+  snprintf(row1, sizeof(row1), "%-15s", line1);
+
+  lcd->setCursor(1, 0);
+  lcd->print(row0);
+  lcd->setCursor(1, 1);
+  lcd->print(row1);
+}
+
 // ============================================================
 // 22. DEBUG SERIAL
 // ============================================================
 // debugSerial: imprime por Serial un resumen periódico (cada DEBUG_INTERVAL) del
 // estado de velocidad/PID/corriente, salvo que el log CSV esté activo
 void debugSerial() {
-  if (csvLogActive) return;
+  if (csvLogActive || velLogActive) return;
   if (millis() - lastDebugTime < DEBUG_INTERVAL) return;
   lastDebugTime = millis();
   float error = setpointSpeed - currentLinearSpeedMs;
@@ -979,9 +1114,8 @@ void setup() {
 
   Serial.println("[ENCODER] Inicializado — HALF_QUAD");
 
-  // Botón del encoder
+  // Botón del encoder (se lee por polling en procesarEntradasEncoder, no interrupción)
   pinMode(ENCODER_SW_PIN, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(ENCODER_SW_PIN), ISR_EncoderBoton, FALLING);
 
   // Emergencia
   pinMode(EMERGENCY_STOP_PIN, INPUT_PULLUP);
@@ -1025,8 +1159,9 @@ void setup() {
   Serial.printf("[INFO] Rodillo Ø%.1fmm | %d imanes | PWM_MIN:%d PWM_MAX:%d\n",
                 DRIVE_ROLLER_DIAMETER_MM, MAGNETS_COUNT,
                 PID_OUTPUT_MIN, PID_OUTPUT_MAX);
-  Serial.println("[INFO] Comandos: SET SP <m/s> | GET VEL | GET ENC | RESET ENC | GET CUR | STOP | TUNE <Kp Ki Kd>");
+  Serial.println("[INFO] Comandos: SET SP <m/s> | GET VEL | GET ENC | RESET ENC | GET CUR | STOP | TUNE <Kp Ki Kd> | LOG VEL START/STOP");
   Serial.println("[INFO] Encoder: Gira para ajustar setpoint temporal, presiona para CONFIRMAR");
+  Serial.println("[INFO] Mantené el botón 10s para abrir el menú dev (Kp/Ki/Kd en vivo)");
 }
 
 // ============================================================
@@ -1081,7 +1216,11 @@ void loop() {
     broadcastState();
   }
 
-  updateLCD();
+  if (devMenuState != DEV_MENU_OFF) {
+    updateLCDDevMenu();
+  } else {
+    updateLCD();
+  }
   debugSerial();
 
   delay(1);
