@@ -23,38 +23,28 @@
 #include <LiquidCrystal_I2C.h>
 #include <algorithm>
 #include "motor_config.h"
+#include "wifi_config.h"
 #include <ESP32Encoder.h>
 #include <PID_v1.h>
+
+
 
 // ============================================================
 // 1. RED / SERVIDOR
 // ============================================================
-const char* ssid       = "ESP32_Motor_Control";
-const char* apPassword = "12345678";
+const char* ssid       = AP_SSID;
+const char* apPassword = AP_PASSWORD;
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
 bool          isWebConnected  = false;
 unsigned long lastWsSendTime  = 0;
-const unsigned long WS_SEND_INTERVAL = 200;
 
 // ============================================================
 // 2. CONSTANTES PWM / FÍSICAS
 // ============================================================
-// Debounce dinámico: rechaza períodos menores a HALL_DEBOUNCE_RATIO × mediana
-// actual (equivale a un salto de velocidad >2x entre pulsos, físicamente
-// imposible en la cinta). HALL_DEBOUNCE_US (5 ms, motor_config.h) es el piso
-// en arranque/timeout; el techo mantiene protección proporcional en todo el
-// rango operativo 0.2–1.5 m/s (períodos ~13–100 ms).
-#define HALL_DEBOUNCE_RATIO    0.5f
-#define HALL_DEBOUNCE_MAX_US   60000UL
 static volatile uint32_t hallMinPeriodUs = HALL_DEBOUNCE_US;
-
-// Límites de salida del PID
-#define PID_OUTPUT_MIN   100          // PWM mínimo para vencer fricción estática
-#define PID_OUTPUT_MAX   MAX_VELOCITY // 1023
-#define PID_STARTUP_PWM  100          // Semilla del integrador al activar el PID (bumpless transfer)
 
 static_assert(HALL_BUFFER_SIZE > 1, "HALL_BUFFER_SIZE debe ser > 1");
 
@@ -66,19 +56,8 @@ static const float HALL_CONST_SPEED = (3.14159265f * DRIVE_ROLLER_DIAMETER_MM * 
                                        / (float)HALL_SLOTS_COUNT;
 
 // ============================================================
-// 3. TEMPORIZACIÓN
-// ============================================================
-#define PID_TIMER_INTERVAL_MS   25UL   // cadencia del loop PID (40 Hz mínimo aunque fallen pulsos Hall)
-#define LCD_UPDATE_INTERVAL    300UL   // refresco de pantalla LCD
-#define DEBUG_INTERVAL        1000UL   // log de depuración por serial
-#define CURRENT_READ_INTERVAL 50UL    // lectura del sensor de corriente (20 Hz)
-
-// ============================================================
 // 4. FILTRO DE MEDIANA + EMA
 // ============================================================
-#define FILTER_SIZE   3
-#define SMOOTH_ALPHA  1.0f  // EMA desactivada (peso 100% al valor nuevo)
-
 static uint32_t filterBuffer[FILTER_SIZE];
 static uint8_t  filterIndex = 0;
 static uint8_t  filterCount = 0;
@@ -121,9 +100,9 @@ static uint8_t magnetCount     = 0;     // cuenta pulsos normales en la vuelta a
 static bool    hallDebugActive = false; // activado con "HALL ON" por serial
 
 // --- PID Brett Beauregard ---
-double Kp = 50.0;
-double Ki = 50.0;
-double Kd = 0.0;
+double Kp = PID_KP_DEFAULT;
+double Ki = PID_KI_DEFAULT;
+double Kd = PID_KD_DEFAULT;
 
 double pidIn  = 0.0;  // Input  → currentLinearSpeedMs
 double pidOut = 0.0;  // Output → PWM
@@ -149,8 +128,6 @@ static uint8_t           lastProcessedHead = 0;
 // ============================================================
 // 6b. LOG CRUDO IMÁN POR IMÁN (para CSV, no usado por el PID)
 // ============================================================
-#define PULSE_LOG_SIZE 32
-
 struct PulseSample {
   uint32_t periodo_us;  // período crudo entre este imán y el anterior
   float    rpm;         // RPM instantánea calculada de ese período
@@ -167,7 +144,6 @@ static bool        pulseLogOverflow = false;
 ESP32Encoder encoder;
 int           lastStableCount    = 0;
 unsigned long lastStableTime     = 0;
-const unsigned long ENCODER_STABILITY_DELAY_MS = 5;
 int           displayEncoderCount = 0;
 
 // Botón: se lee por polling (no interrupción) para poder distinguir un
@@ -177,8 +153,6 @@ bool          buttonIsDown         = false;
 unsigned long buttonDownSinceMs    = 0;
 bool          longPressFired       = false;
 unsigned long lastButtonDebounce   = 0;
-const unsigned long ENCODER_BUTTON_DEBOUNCE_MS = 50;
-#define DEV_MENU_HOLD_MS 10000UL
 
 // ============================================================
 // 7b. MENÚ DESARROLLADOR (edición de Kp/Ki/Kd en vivo desde el LCD)
@@ -190,7 +164,7 @@ static uint8_t       devMenuIndex = 0;   // índice del parámetro seleccionado
 
 static const char* const DEV_MENU_ITEMS[] = { "Kp", "Ki", "Kd", "SALIR" };
 static const uint8_t  DEV_MENU_ITEM_COUNT = 4;
-static const double   DEV_MENU_STEP[]     = { 0.1, 0.1, 0.1 }; // por click, Kp/Ki/Kd
+static const double   DEV_MENU_STEP[]     = { DEV_MENU_STEP_KP, DEV_MENU_STEP_KI, DEV_MENU_STEP_KD };
 
 // ============================================================
 // 8. PARADA DE EMERGENCIA
@@ -198,7 +172,6 @@ static const double   DEV_MENU_STEP[]     = { 0.1, 0.1, 0.1 }; // por click, Kp/
 volatile bool emergencyStopTriggered = false;
 bool          emergencyStopPending   = false;
 unsigned long lastEmergencyDebounce  = 0;
-const unsigned long EMERGENCY_DEBOUNCE_MS = 100;
 
 // ============================================================
 // 9. CORRIENTE
@@ -222,7 +195,6 @@ unsigned long  lastDebugTime = 0;
 // ============================================================
 // 12. LED
 // ============================================================
-#define LED_BUILTIN_PIN 2
 unsigned long lastBlink = 0;
 
 // ============================================================
@@ -643,6 +615,12 @@ static void calculateSpeed() {
   currentRPM           = filteredRPM_Last;
   currentLinearSpeedMs = filteredVel_Last;
 
+  // --- EJECUTAR PID (event-driven) CADA VEZ QUE HAY UN PULSO ---
+  // Va antes que cualquier Serial.printf() de log: el log es bloqueante
+  // (puede tardar varios ms si el buffer de TX se llena) y no debe demorar
+  // la corrección del motor, que ya tiene todo lo que necesita calculado.
+  computePID();
+
   // --- LOG VEL: una línea por actualización con la velocidad filtrada que
   // efectivamente ve el PID (currentLinearSpeedMs) — para graficar vel(t)
   // y validar el sensor, a diferencia de LOG START que loguea velocidad
@@ -674,24 +652,22 @@ static void calculateSpeed() {
         velCruda, setpointSpeed, errRel);
     }
   }
-
-  // --- EJECUTAR PID MANUAL (event-driven) CADA VEZ QUE HAY UN PULSO ---
-  computePID();
 }
 
 // ============================================================
 // 17. LECTURA DE CORRIENTE
 // ============================================================
-// updateCurrentReading: promedia 20 lecturas del sensor de corriente (cada CURRENT_READ_INTERVAL)
-// y las convierte a amperes usando el offset y la sensibilidad del sensor
+// updateCurrentReading: promedia CURRENT_ADC_SAMPLES lecturas del sensor de corriente
+// (cada CURRENT_READ_INTERVAL) y las convierte a amperes usando el offset y la
+// sensibilidad del sensor
 static void updateCurrentReading() {
   if (millis() - lastCurrentReadTime < CURRENT_READ_INTERVAL) return;
   lastCurrentReadTime = millis();
 
   uint32_t sum = 0;
-  for (int i = 0; i < 20; i++) sum += analogRead(MOTOR_CS_PIN);
+  for (int i = 0; i < CURRENT_ADC_SAMPLES; i++) sum += analogRead(MOTOR_CS_PIN);
 
-  float voltage   = (sum / 20.0f) * (3.3f / 4095.0f);
+  float voltage   = (sum / (float)CURRENT_ADC_SAMPLES) * (3.3f / 4095.0f);
   float corrected = max(voltage - CS_OFFSET_VOLTAGE, 0.0f);
   cachedCurrent   = corrected / CS_VOLTAGE_PER_AMP;
 }
@@ -1075,7 +1051,7 @@ void debugSerial() {
 // setup: configura pines de motor/Hall/encoder/emergencia, arranca el PID en MANUAL,
 // inicializa LCD, levanta el WiFi AP y el servidor HTTP/WebSocket
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(460800);
   Serial.println("\n[BOOT] Trotadora PID v9.11.0 - Anti-windup simétrico");
 
   // Motor
@@ -1223,5 +1199,4 @@ void loop() {
   }
   debugSerial();
 
-  delay(1);
 }

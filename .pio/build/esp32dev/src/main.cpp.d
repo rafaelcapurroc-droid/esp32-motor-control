@@ -210,7 +210,7 @@
  C:/Users/Rafa/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.h \
  C:/Users/Rafa/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h \
  .pio/libdeps/esp32dev/LiquidCrystal_I2C/LiquidCrystal_I2C.h \
- include/motor_config.h \
+ include/motor_config.h include/wifi_config.h \
  .pio/libdeps/esp32dev/ESP32Encoder/src/ESP32Encoder.h \
  C:/Users/Rafa/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/driver/include/driver/pcnt.h \
  C:/Users/Rafa/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/include/hal/include/hal/pcnt_types.h \
