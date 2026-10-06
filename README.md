@@ -1,340 +1,101 @@
-# ESP32 WiFi Motor Control System
-Control complete de motor DC con VNH5019 Pololu mediante **Servidor Web WiFi con interfaz web interactiva**.
+# Trotadora de velocidad controlable para roedores
 
-**✨ Acceso desde cualquier dispositivo (Android, iOS, Windows, Mac) sin instalar app.**
+Proyecto de título de Ingeniería Civil Electrónica, Pontificia Universidad Católica de Valparaíso (julio 2026). Nota: 7,0.
 
----
+Prototipo de trotadora para el laboratorio de la Escuela de Kinesiología de la PUCV. Mantiene la cinta a la velocidad fijada entre 0,1 y 2,0 m/s con control PID en lazo cerrado. Validado con dos referencias independientes: **error menor a 1 % medido por video y menor a 5 % medido por el sensor interno**, en 7 velocidades entre 0,5 y 2,0 m/s.
 
-## 🌟 Características
+![Prototipo final con una rata adulta en ensayo](docs/img/trotadora.jpg)
 
-✅ **Servidor Web Responsivo**
-- Interfaz moderna profesional
-- Funciona en navegador
-- Diseño mobile-first
+## Contexto
 
-✅ **Control Motor en Tiempo Real**
-- Slider de velocidad (0-255 PWM)
-- Dirección forward/reverse
-- Respuesta <50ms
+El laboratorio estudia capacidades fisiológicas en roedores y no contaba con una trotadora. Comprar un equipo comercial (~USD 2.000) implicaba una inversión alta y largos plazos de importación, y en Chile hay pocos proveedores de este tipo de equipamiento. Construirlo con materiales disponibles localmente permite además replicarlo y adaptarlo a cada protocolo experimental.
 
-✅ **Gráficos Interactivos**
-- Velocidad vs Tiempo
-- Corriente vs Tiempo  
-- Potencia vs Tiempo (calculada)
-- Actualizaciones 10 Hz
+Requisitos definidos a partir de protocolos publicados de ejercicio en roedores:
 
-✅ **Hardware**
-- Motor DC via VNH5019 Pololu
-- Sensor de corriente (CS pin)
-- PWM 20kHz para suave operación
+| Requisito | Meta | Logrado |
+|---|---|---|
+| Error de velocidad en lazo cerrado | < 5 % | < 0,9 % (video) · < 4,8 % (sensor Hall) |
+| Rango de velocidad | 0,5 – 1,5 m/s | 0,1 – 2,0 m/s, en pasos de 0,05 m/s |
+| Estabilidad en régimen permanente | < ±5 % | ±0,4 % |
+| Operación suave y silenciosa | Minimizar el estrés del animal | PWM a 20 kHz, fuera del rango audible |
 
-✅ **Conectividad**
-- WiFi estándar (2.4/5GHz)
-- Punto de acceso integrado
-- WebSocket para datos en tiempo real
+## Diseño mecánico
 
----
+El principal desafío del proyecto fue mecánico. La estructura pasó por tres iteraciones:
 
-## � Documentación
+1. **Chasis impreso en 3D** (descartado): holgura y desalineación de la cinta. Los alojamientos plásticos de los rodamientos no resistían la carga dinámica.
+2. **Bastidor de aluminio con soportes plásticos** (descartado): más rígido, pero la cinta seguía desplazándose hacia un lado.
+3. **Perfil de aluminio con alojamientos mecanizados** (final): rodamientos montados directamente sobre el aluminio y tensado fino manual. Eliminó el desplazamiento lateral de la cinta.
 
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Arquitectura general y guía de desarrollo
-- **[README_WIFI.md](docs/README_WIFI.md)** - Configuración WiFi en detalle
-- **[PIN_ANALYSIS.md](docs/PIN_ANALYSIS.md)** - Análisis de pines y configuración hardware
-- **[BLE_PROTOCOL.md](docs/BLE_PROTOCOL.md)** - Especificación protocolo BLE
-- **[MOBILE_APP_GUIDE.md](docs/MOBILE_APP_GUIDE.md)** - Guía desarrollo app móvil
+## Motorización
 
----
+Se probaron motor BLDC, motor DC y motor paso a paso. Se eligió un **motor DC de 24 V** por su mejor torque tanto a bajas como a altas revoluciones. La relación de velocidad se ajustó con una transmisión por poleas de distinto diámetro.
 
-## �🚀 Quick Start
+## Electrónica y control
 
-### 1. Compilar y Cargar
+![Diagrama de bloques del lazo cerrado](docs/img/diagrama_bloques.png)
 
-```powershell
-# Build proyecto
-pio run
+| Componente | Función |
+|---|---|
+| ESP32 | Lazo de control, cálculo de velocidad, interfaz local y web |
+| Driver Pololu VNH5019 | Etapa de potencia del motor DC 24 V, con medición de corriente |
+| Sensor de efecto Hall + 5 imanes de neodimio | Medición de velocidad en el rodillo motriz (Ø 38,5 mm) |
+| Encoder rotatorio KY-040 + LCD 16x2 I²C | Ajuste de la consigna y visualización local |
 
-# Subir a ESP32 (conecta via USB)
-pio run --target upload
+**Medición de velocidad.** Una interrupción guarda el tiempo entre pulsos del sensor Hall en un buffer circular. La velocidad se calcula con la mediana de los últimos períodos, lo que descarta lecturas aisladas erróneas. El filtro anti-rebote se ajusta solo, rechazando pulsos más cortos que el 50 % de la mediana actual.
 
-# Ver salida
-pio device monitor
-```
+**Diente faltante (mejora posterior a la defensa).** La versión defendida usaba 6 imanes equiespaciados. Junto al profesor guía se cambió a 5 imanes en 6 posiciones, dejando una vacía, la misma técnica de las ruedas fónicas de cigüeñal en motores. El hueco produce un período del doble de largo que el firmware reconoce como inicio de vuelta. Así sabe en qué posición del rodillo está, cuenta vueltas completas sin acumular error y se resincroniza solo si pierde un pulso. El período del hueco no entra al filtro de velocidad, para no ensuciar la mediana.
 
-### 2. Conectar WiFi (desde móvil/tablet)
+**Control.** PID (librería Arduino PID) con anti-windup y PWM de 10 bits a 20 kHz. Las ganancias Kp, Ki y Kd se pueden ajustar en vivo desde un menú en el LCD, sin recompilar.
 
-**Android**: Configuración > WiFi > Busca `ESP32_Motor_Control` > Contraseña: `12345678`
+**Interfaz.** Control local con perilla y LCD, y un servidor web en el propio ESP32 para ajustar la velocidad y ver los datos en tiempo real desde el celular (WebSocket). Los datos se exportan en CSV.
 
-**iOS**: Ajustes > WiFi > Busca `ESP32_Motor_Control` > Contraseña: `12345678`
+| Control web | Monitoreo web |
+|---|---|
+| ![Interfaz de control](docs/img/web_control.png) | ![Interfaz de monitoreo](docs/img/web_monitoreo.png) |
 
-### 3. Abrir en Navegador
+## Validación
 
-```
-http://192.168.4.1
-```
+La velocidad se validó con dos fuentes que miden con principios físicos distintos, en 7 velocidades entre 0,5 y 2,0 m/s:
 
-**¡Listo para controlar el motor!**
+- **Externa (video):** cámara a 120 fps apuntando a una marca amarilla pintada en la cinta. Un script en Python con OpenCV segmenta la marca en espacio HSV y mide el período de cada vuelta (promedio de 20 vueltas por velocidad). Los resultados se confirmaron contando cuadro a cuadro a mano.
+- **Interna (sensor Hall):** la misma medición que usa el lazo de control, registrada por puerto serial.
 
----
+![Error de velocidad por fuente y velocidad](docs/img/validacion_error.png)
 
-## 📁 Estructura del Proyecto
+El error medido por video se mantuvo bajo 0,9 % en todo el rango (mejor resultado: 0,18 % a 1,0 m/s). El sensor Hall registra más error a baja velocidad (4,79 % a 0,5 m/s) por la resolución limitada que dan pocos imanes en el rodillo. Estos resultados corresponden a la versión de 6 imanes. En términos absolutos, la variación de velocidad se mantuvo entre ±0,02 y ±0,04 m/s.
+
+**Limitación:** las mediciones de validación se hicieron con la cinta sin carga. El equipo se probó luego con una rata adulta, manteniendo una marcha estable.
+
+## Trabajo futuro
+
+- Inclinación regulable de la cinta (0°, 5° y 10°).
+- Ensayos con animales bajo protocolos de habituación estandarizados.
+- Más imanes en el rodillo para reducir el error a baja velocidad.
+- Repetir la validación con la configuración de diente faltante.
+
+## Estructura del repositorio
 
 ```
-Esp32/
-├── platformio.ini              # Build config (WiFi libraries)
-├── src/
-│   └── main.cpp               # Servidor WiFi + Motor Control
-├── include/
-│   ├── web_pages.h            # HTML/CSS/JS (interfaz web)
-│   ├── wifi_config.h          # Configuración WiFi
-│   └── motor_config.h         # Configuración pines motor
-├── README.md                  # Este archivo
-├── README_WIFI.md             # Documentación WiFi detallada
-├── BLE_PROTOCOL.md            # (Anterior - usar WiFi ahora)
-├── MOBILE_APP_GUIDE.md        # (Anterior - usar web app ahora)
-└── copilot-instructions.md    # Guía de desarrollo
+src/main.cpp           Firmware (C++, framework Arduino)
+include/               Configuración de pines, motor y Wi-Fi
+data/                  Páginas web servidas desde LittleFS
+docs/                  Arquitectura, análisis de pines e imágenes
+log_serial.py          Registro de velocidad por serial a CSV
+test hsv.py            Medición de velocidad por video (OpenCV, SciPy)
 ```
 
----
+## Compilar y cargar
 
-## 🔧 Configuración
+Requiere [PlatformIO](https://platformio.org/).
 
-### WiFi SSID / Contraseña
-
-Edita `include/wifi_config.h`:
-
-```cpp
-#define WIFI_SSID "Mi_WiFi"
-#define WIFI_PASSWORD "mipass"
+```bash
+pio run --target upload        # firmware
+pio run --target uploadfs      # páginas web a LittleFS
+pio device monitor             # monitor serial (460800 baudios)
 ```
 
-### Pines GPIO
+## Autor
 
-Edita `include/motor_config.h`:
-
-```cpp
-#define MOTOR_PWM_PIN 25       // Cambiar si necesario
-#define MOTOR_IN1_PIN 26
-#define MOTOR_IN2_PIN 27
-#define MOTOR_CS_PIN 35
-```
-
-### Calibración Sensor Corriente
-
-En `src/main.cpp`, función `readMotorCurrent()`:
-
-```cpp
-float current = (voltage - 0.5) / 1.0;  // Ajusta offset (0.5) y escala (1.0)
-```
-
----
-
-## 🌐 Interfaz Web
-
-### Panel de Control
-- **Slider**: Velocidad 0-100%
-- **Botones**: Adelante / Atrás
-- **Status**: Corriente y Potencia en tiempo real
-
-### Gráficos
-- 3 gráficos Chart.js
-- Última 100 muestras (~10 segundos)
-- Actualización continua 10Hz
-
-### Tabla de Datos
-- Últimas 10 muestras
-- Timestamp, velocidad, dirección, corriente, potencia
-
----
-
-## 🔌 Hardware
-
-### Wiring
-
-```
-ESP32          VNH5019
-GPIO 25   -->  PWM
-GPIO 26   -->  IN1
-GPIO 27   -->  IN2
-GPIO 35   -->  CS (current sense)
-GND       -->  GND
-```
-
-Motor conectado a terminales M1/M2 del VNH5019.
-
-### Alimentación
-
-- ESP32: 5V USB
-- VNH5019: 12V (motor supply)
-- GND común
-
----
-
-## 📊 API Endpoints
-
-### WebSocket: `/ws`
-Conexión bidireccional para datos en tiempo real.
-
-```json
-// ClienteMotor → ESP32
-{"velocity": 150}
-{"direction": 1}
-
-// ESP32 → Cliente (cada 100ms)
-{
-  "velocity": 150,
-  "direction": 1,
-  "current": 2.34,
-  "timestamp": 1234
-}
-```
-
-### HTTP: `/api/status`
-```
-GET http://192.168.4.1/api/status
-→ {"velocity": 150, "direction": 1, "current": 2.34}
-```
-
-### HTTP: `/api/history`
-```
-GET http://192.168.4.1/api/history
-→ {"velocities": [...], "currents": [...], "timestamps": [...]}
-```
-
----
-
-## 🔍 Debugging
-
-### Serial Monitor (115200 baud)
-
-```powershell
-pio device monitor
-```
-
-**Salida típica**:
-```
-[WiFi] Access Point: ESP32_Motor_Control
-[WiFi] AP IP: 192.168.4.1
-[HTTP] Web server started on port 80
-```
-
-### Browser Console (F12)
-
-Ver WebSocket messages en tiempo real.
-
----
-
-## ⚠️ Troubleshooting
-
-| Problema | Solución |
-|----------|----------|
-| No aparece WiFi | Resetea ESP32 (botón RESET) |
-| No carga página | Espera 30s, luego F5 |
-| Motor no responde | Verifica power supply a VNH5019 |
-| Corriente = 0 | Calibra sensor CS (edita main.cpp) |
-| Desconexiones | Acércate al ESP32, verifica router |
-
----
-
-## 📈 Performance
-
-- **Actualización datos**: 100ms (10 Hz)
-- **Latencia control**: <50ms
-- **Rango WiFi**: 30m interior típico
-- **Clientes simultáneos**: 5-10
-- **Consumo RAM**: ~60KB
-
----
-
-## 🎯 Especificaciones Motor
-
-| Parámetro | Valor |
-|-----------|-------|
-| Velocidad PWM | 0-255 (8-bit) |
-| Frecuencia PWM | 20 kHz |
-| Dirección | Forward/Reverse |
-| Corriente máxima | ~30A (VNH5019) |
-| Rango sensado | 0-30A |
-| Resolución corriente | 0.02A |
-
----
-
-## 🛠️ Comandos PlatformIO
-
-```powershell
-# Build
-pio run
-
-# Upload
-pio run --target upload
-
-# Monitor serial
-pio device monitor --baud 115200
-
-# Clean
-pio run --target clean
-
-# Build release
-pio run -e release
-```
-
----
-
-## 📱 Acceso Remoto
-
-### En la Misma Red
-```
-http://192.168.4.1     (Access Point)
-http://192.168.1.100   (Si conectado a router)
-```
-
-### Con mDNS
-```
-http://esp32-motor.local
-```
-(Si tu router soporta mDNS)
-
----
-
-## 🚀 Deployment
-
-1. ✅ Testé motor acceleration/deceleration
-2. ✅ Verificó corriente bajo carga
-3. ✅ Probó WiFi en diferentes ubicaciones
-4. ✅ Múltiples clientes simultáneamente
-5. ✅ Gráficos actualizan correctamente
-6. ✅ Sensor de corriente calibrado
-
-**Sistema listo para producción** ✓
-
----
-
-## 🔗 Referencias
-
-- **ESPAsyncWebServer**: https://github.com/me-no-dev/ESPAsyncWebServer
-- **AsyncTCP**: https://github.com/me-no-dev/AsyncTCP
-- **Chart.js**: https://www.chartjs.org/
-- **VNH5019**: https://www.pololu.com/product/3034
-- **ESP32 Docs**: https://docs.espressif.com/
-
----
-
-## 📝 Notas
-
-- **Anterior**: Se usaba BLE + App Flutter. Ahora: WiFi + Web App (más universal)
-- **Sin App**: Funciona en cualquier navegador (iOS + Android)
-- **Simple**: Solo conectar y abrir URL en navegador
-- **Escalable**: Fácil de extender con nuevas funciones
-
----
-
-## 📞 Soporte
-
-Para detalles adicionales, ver:
-- [README_WIFI.md](README_WIFI.md) - Documentación WiFi completa
-- [copilot-instructions.md](copilot-instructions.md) - Guía de desarrollo
-
----
-
-**Sistema WiFi Motor Control - Operacional ✓**
-
-Controla tu motor desde cualquier dispositivo en tiempo real con gráficos interactivos. ¡Disfruta! 🎉
+Rafael Capurro Carrillo — Ingeniero Civil Electrónico, PUCV
+rafael.capurro.c@mail.pucv.cl
